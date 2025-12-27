@@ -1,8 +1,8 @@
-# uringloop Architecture
+# uringcore Architecture
 
 ## Design Philosophy
 
-The uringloop project implements a completion-driven event loop for Python's asyncio framework. Unlike traditional event loops that rely on readiness notification (epoll/kqueue), this implementation leverages the Linux io_uring interface to receive completion events directly from the kernel.
+The uringcore project implements a completion-driven event loop for Python's asyncio framework. Unlike traditional event loops that rely on readiness notification (epoll/kqueue), this implementation leverages the Linux io_uring interface to receive completion events directly from the kernel.
 
 ## System Architecture
 
@@ -80,7 +80,7 @@ Per-file-descriptor state tracking enables sophisticated flow control and resour
 
 Traditional asyncio event loops operate on readiness notifications: the selector indicates when a file descriptor can perform I/O without blocking, then the application issues the actual I/O syscall.
 
-uringloop inverts this model:
+uringcore inverts this model:
 
 1. **Submission Phase**: The application submits I/O requests to io_uring's submission queue. No data transfer occurs yet.
 

@@ -1,13 +1,13 @@
-"""Event loop policy for uringloop.
+"""Event loop policy for uringcore.
 
 This module provides the EventLoopPolicy class that enables
-uringloop to be used as a drop-in replacement for uvloop.
+uringcore to be used as a drop-in replacement for uvloop.
 
 Usage:
     import asyncio
-    import uringloop
+    import uringcore
 
-    asyncio.set_event_loop_policy(uringloop.EventLoopPolicy())
+    asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 """
 
 import asyncio
@@ -15,15 +15,15 @@ import sys
 import threading
 from typing import Optional
 
-from uringloop.loop import UringEventLoop
+from uringcore.loop import UringEventLoop
 
 
 class EventLoopPolicy(asyncio.AbstractEventLoopPolicy):
-    """Event loop policy for uringloop.
+    """Event loop policy for uringcore.
     
     This policy creates UringEventLoop instances for asyncio operations.
-    Use asyncio.set_event_loop_policy(uringloop.EventLoopPolicy())
-    to enable uringloop as the default event loop.
+    Use asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
+    to enable uringcore as the default event loop.
     """
 
     def __init__(self):

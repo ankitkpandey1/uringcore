@@ -1,4 +1,4 @@
-"""E2E tests for uringloop with Starlette."""
+"""E2E tests for uringcore with Starlette."""
 
 import asyncio
 import pytest
@@ -18,7 +18,7 @@ def json_endpoint(request):
     return JSONResponse({
         "message": "Hello",
         "framework": "Starlette",
-        "event_loop": "uringloop"
+        "event_loop": "uringcore"
     })
 
 
@@ -100,7 +100,7 @@ class TestStarletteConcurrency:
 
 
 class TestStarletteWithUringloop:
-    """Tests specifically for uringloop integration."""
+    """Tests specifically for uringcore integration."""
 
     @pytest.mark.asyncio
     async def test_async_context(self):

@@ -1,4 +1,4 @@
-"""Basic tests for uringloop."""
+"""Basic tests for uringcore."""
 
 import asyncio
 import pytest
@@ -8,15 +8,15 @@ class TestBasicFunctionality:
     """Test basic event loop functionality."""
 
     def test_import(self):
-        """Test that uringloop can be imported."""
-        import uringloop
-        assert hasattr(uringloop, "UringCore")
-        assert hasattr(uringloop, "UringEventLoop")
-        assert hasattr(uringloop, "EventLoopPolicy")
+        """Test that uringcore can be imported."""
+        import uringcore
+        assert hasattr(uringcore, "UringCore")
+        assert hasattr(uringcore, "UringEventLoop")
+        assert hasattr(uringcore, "EventLoopPolicy")
 
     def test_core_creation(self):
         """Test that UringCore can be created."""
-        from uringloop import UringCore
+        from uringcore import UringCore
         
         core = UringCore()
         assert core.event_fd >= 0
@@ -24,7 +24,7 @@ class TestBasicFunctionality:
 
     def test_event_loop_creation(self):
         """Test that UringEventLoop can be created."""
-        from uringloop import UringEventLoop
+        from uringcore import UringEventLoop
         
         loop = UringEventLoop()
         assert not loop.is_running()
@@ -34,7 +34,7 @@ class TestBasicFunctionality:
 
     def test_buffer_stats(self):
         """Test buffer statistics."""
-        from uringloop import UringCore
+        from uringcore import UringCore
         
         core = UringCore()
         total, free, quarantined, in_use = core.buffer_stats()
@@ -46,7 +46,7 @@ class TestBasicFunctionality:
 
     def test_fd_stats(self):
         """Test FD state statistics."""
-        from uringloop import UringCore
+        from uringcore import UringCore
         
         core = UringCore()
         fd_count, inflight, queued, paused = core.fd_stats()
@@ -61,14 +61,14 @@ class TestEventLoopPolicy:
 
     def test_policy_creation(self):
         """Test that EventLoopPolicy can be created."""
-        from uringloop import EventLoopPolicy
+        from uringcore import EventLoopPolicy
         
         policy = EventLoopPolicy()
         assert policy is not None
 
     def test_new_event_loop(self):
         """Test creating a new event loop via policy."""
-        from uringloop import EventLoopPolicy, UringEventLoop
+        from uringcore import EventLoopPolicy, UringEventLoop
         
         policy = EventLoopPolicy()
         try:

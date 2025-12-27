@@ -1,1 +1,1 @@
-# E2E tests for uringloop
+# E2E tests for uringcore

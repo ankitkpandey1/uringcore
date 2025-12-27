@@ -1,4 +1,4 @@
-//! uringloop: Completion-driven asyncio event loop using `io_uring`.
+//! uringcore: Completion-driven asyncio event loop using `io_uring`.
 //!
 //! This crate provides a 1:1 drop-in replacement for uvloop built on `io_uring`
 //! with Completion-Driven Virtual Readiness (CDVR).
@@ -20,9 +20,9 @@
 //!
 //! ```python
 //! import asyncio
-//! import uringloop
+//! import uringcore
 //!
-//! asyncio.set_event_loop_policy(uringloop.EventLoopPolicy())
+//! asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 //!
 //! async def main():
 //!     # Your async code here
@@ -56,7 +56,7 @@ use buffer::BufferPool;
 use ring::{OpType, Ring};
 use state::{FDStateManager, SocketType};
 
-/// The main uringloop engine exposed to Python.
+/// The main uringcore engine exposed to Python.
 #[pyclass]
 pub struct UringCore {
     /// The `io_uring` ring

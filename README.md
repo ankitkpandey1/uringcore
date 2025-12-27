@@ -1,4 +1,4 @@
-# uringloop
+# uringcore
 
 [![CI](https://github.com/ankitkpandey1/uringcore/actions/workflows/ci.yml/badge.svg)](https://github.com/ankitkpandey1/uringcore/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -9,7 +9,7 @@ A high-performance asyncio event loop for Linux using io_uring.
 
 ## Introduction
 
-uringloop provides a drop-in replacement for Python's asyncio event loop, built on the io_uring interface available in Linux kernel 5.11+. The project targets use cases where low-latency I/O and high throughput are critical requirements.
+uringcore provides a drop-in replacement for Python's asyncio event loop, built on the io_uring interface available in Linux kernel 5.11+. The project targets use cases where low-latency I/O and high throughput are critical requirements.
 
 The implementation leverages a completion-driven architecture rather than the traditional readiness-based model used by epoll. This design eliminates syscalls from the hot path, resulting in measurable performance improvements for network-intensive applications.
 
@@ -35,7 +35,7 @@ Optional:
 ### From PyPI (when published)
 
 ```bash
-pip install uringloop
+pip install uringcore
 ```
 
 ### From Source
@@ -57,19 +57,19 @@ maturin develop
 
 ## Quick Start
 
-Replace the default asyncio event loop with uringloop:
+Replace the default asyncio event loop with uringcore:
 
 ```python
 import asyncio
-import uringloop
+import uringcore
 
 # Set the event loop policy
-asyncio.set_event_loop_policy(uringloop.EventLoopPolicy())
+asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 
 async def main():
     # Standard asyncio code works unchanged
     await asyncio.sleep(1)
-    print("Hello from uringloop!")
+    print("Hello from uringcore!")
 
 asyncio.run(main())
 ```
@@ -78,28 +78,28 @@ asyncio.run(main())
 
 ```python
 import asyncio
-import uringloop
+import uringcore
 from fastapi import FastAPI
 
-asyncio.set_event_loop_policy(uringloop.EventLoopPolicy())
+asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 
 app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Powered by uringloop"}
+    return {"message": "Powered by uringcore"}
 ```
 
 ### With Starlette
 
 ```python
 import asyncio
-import uringloop
+import uringcore
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-asyncio.set_event_loop_policy(uringloop.EventLoopPolicy())
+asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 
 async def homepage(request):
     return JSONResponse({"hello": "world"})
@@ -127,7 +127,7 @@ uringcore/
 │   ├── state.rs            # FD state machine
 │   └── error.rs            # Error types
 ├── python/                 # Python layer
-│   └── uringloop/
+│   └── uringcore/
 │       ├── __init__.py
 │       ├── loop.py         # UringEventLoop
 │       └── policy.py       # EventLoopPolicy

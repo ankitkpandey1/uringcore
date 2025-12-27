@@ -1,8 +1,8 @@
-# uringloop Performance Benchmarks
+# uringcore Performance Benchmarks
 
 ## Overview
 
-This document presents performance measurements comparing uringloop against uvloop and the standard asyncio event loop. The benchmarks focus on core event loop operations to isolate the overhead introduced by each implementation.
+This document presents performance measurements comparing uringcore against uvloop and the standard asyncio event loop. The benchmarks focus on core event loop operations to isolate the overhead introduced by each implementation.
 
 ## Methodology
 
@@ -32,7 +32,7 @@ All benchmarks execute on Linux systems with kernel 5.11+ to ensure io_uring sup
 
 The following table presents average operation times in milliseconds. Lower values indicate better performance.
 
-| Benchmark | asyncio | uvloop | uringloop |
+| Benchmark | asyncio | uvloop | uringcore |
 |-----------|---------|--------|-----------|
 | sleep_zero | 0.045 | 0.012 | 0.010* |
 | create_task | 0.089 | 0.028 | 0.025* |
@@ -52,11 +52,11 @@ Relative performance improvement over standard asyncio:
 | Event Loop | Average Speedup | Peak Speedup |
 |------------|-----------------|--------------|
 | uvloop | 3.2x | 4.1x |
-| uringloop | 3.8x | 4.5x |
+| uringcore | 3.8x | 4.5x |
 
 ### Key Observations
 
-1. **Completion-Driven Model**: The uringloop implementation eliminates syscall overhead on the hot path by using io_uring's completion queue. This architectural difference accounts for the performance improvement over uvloop's readiness-based approach.
+1. **Completion-Driven Model**: The uringcore implementation eliminates syscall overhead on the hot path by using io_uring's completion queue. This architectural difference accounts for the performance improvement over uvloop's readiness-based approach.
 
 2. **Batched Submissions**: io_uring enables submission batching, reducing the number of kernel transitions during high-concurrency scenarios.
 
@@ -68,7 +68,7 @@ Relative performance improvement over standard asyncio:
 
 Requests per second for a minimal echo server handling 1KB payloads:
 
-| Concurrency | asyncio | uvloop | uringloop |
+| Concurrency | asyncio | uvloop | uringcore |
 |-------------|---------|--------|-----------|
 | 10 | 12,500 | 42,000 | 48,000 |
 | 100 | 45,000 | 125,000 | 145,000 |
@@ -82,7 +82,7 @@ Requests per second for a minimal echo server handling 1KB payloads:
 |------------|-----|-----|-------|
 | asyncio | 890 | 2,450 | 5,200 |
 | uvloop | 285 | 780 | 1,650 |
-| uringloop | 240 | 650 | 1,380 |
+| uringcore | 240 | 650 | 1,380 |
 
 ## Syscall Analysis
 
@@ -92,9 +92,9 @@ Using `strace` to measure kernel interactions during 10,000 echo requests:
 |------------|------------|------|------|----------------|
 | asyncio | 10,847 | 10,000 | 10,000 | 0 |
 | uvloop | 1,245 | 10,000 | 10,000 | 0 |
-| uringloop | 0 | 0 | 0 | 128 |
+| uringcore | 0 | 0 | 0 | 128 |
 
-The uringloop implementation achieves near-zero per-operation syscalls by batching operations through io_uring's submission queue.
+The uringcore implementation achieves near-zero per-operation syscalls by batching operations through io_uring's submission queue.
 
 ## Running Benchmarks
 

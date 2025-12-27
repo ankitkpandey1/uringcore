@@ -1,11 +1,11 @@
-//! Error types for uringloop.
+//! Error types for uringcore.
 
 use thiserror::Error;
 
-/// Result type alias for uringloop operations.
+/// Result type alias for uringcore operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Errors that can occur in uringloop operations.
+/// Errors that can occur in uringcore operations.
 #[derive(Error, Debug)]
 pub enum Error {
     /// Buffer allocation failed

@@ -1,4 +1,4 @@
-"""E2E tests for uringloop with FastAPI."""
+"""E2E tests for uringcore with FastAPI."""
 
 import asyncio
 import pytest
@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 
 # Create FastAPI application
-app = FastAPI(title="uringloop E2E Test", version="1.0.0")
+app = FastAPI(title="uringcore E2E Test", version="1.0.0")
 
 
 class EchoRequest(BaseModel):
@@ -27,7 +27,7 @@ class EchoResponse(BaseModel):
 @app.get("/")
 def read_root():
     """Root endpoint."""
-    return {"message": "Hello from FastAPI!", "event_loop": "uringloop"}
+    return {"message": "Hello from FastAPI!", "event_loop": "uringcore"}
 
 
 @app.get("/health")
@@ -190,7 +190,7 @@ class TestFastAPIConcurrency:
 
 
 class TestFastAPIWithUringloop:
-    """Tests specifically for uringloop integration."""
+    """Tests specifically for uringcore integration."""
 
     def test_openapi_schema(self):
         """Test OpenAPI schema generation."""
@@ -198,7 +198,7 @@ class TestFastAPIWithUringloop:
         response = client.get("/openapi.json")
         assert response.status_code == 200
         schema = response.json()
-        assert schema["info"]["title"] == "uringloop E2E Test"
+        assert schema["info"]["title"] == "uringcore E2E Test"
 
     def test_docs_available(self):
         """Test docs endpoint."""

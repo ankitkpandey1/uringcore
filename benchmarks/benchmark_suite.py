@@ -1,4 +1,4 @@
-"""Benchmark suite comparing uringloop vs uvloop performance.
+"""Benchmark suite comparing uringcore vs uvloop performance.
 
 This module provides standardized benchmarks for measuring event loop
 performance across different workloads.
@@ -190,19 +190,19 @@ def run_all_benchmarks() -> dict:
         uvloop_results = run_benchmark_suite("uvloop", set_uvloop)
         all_results["loops"]["uvloop"] = [asdict(r) for r in uvloop_results]
     
-    # uringloop
+    # uringcore
     try:
-        from uringloop import EventLoopPolicy
+        from uringcore import EventLoopPolicy
         
-        def set_uringloop():
+        def set_uringcore():
             policy = EventLoopPolicy()
             asyncio.set_event_loop(policy.new_event_loop())
         
-        print("Running uringloop benchmarks...")
-        uringloop_results = run_benchmark_suite("uringloop", set_uringloop)
-        all_results["loops"]["uringloop"] = [asdict(r) for r in uringloop_results]
+        print("Running uringcore benchmarks...")
+        uringcore_results = run_benchmark_suite("uringcore", set_uringcore)
+        all_results["loops"]["uringcore"] = [asdict(r) for r in uringcore_results]
     except Exception as e:
-        print(f"uringloop not available: {e}")
+        print(f"uringcore not available: {e}")
     
     return all_results
 
@@ -296,7 +296,7 @@ def print_comparison(results: dict):
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("uringloop Benchmark Suite")
+    print("uringcore Benchmark Suite")
     print("=" * 60)
     
     results = run_all_benchmarks()

@@ -11,7 +11,7 @@ import selectors
 import time
 from typing import Any, Callable, Optional
 
-from uringloop._core import UringCore
+from uringcore._core import UringCore
 
 
 class UringEventLoop(asyncio.AbstractEventLoop):

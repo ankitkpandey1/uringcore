@@ -1,5 +1,5 @@
 [package]
-name = "uringloop"
+name = "uringcore"
 version = "0.1.0"
 edition = "2021"
 authors = ["Ankit Kumar Pandey <ankitkpandey1@gmail.com>"]
@@ -11,7 +11,7 @@ categories = ["asynchronous", "network-programming"]
 readme = "README.md"
 
 [lib]
-name = "uringloop"
+name = "uringcore"
 crate-type = ["cdylib"]
 
 [dependencies]

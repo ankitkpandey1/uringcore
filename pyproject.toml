@@ -3,7 +3,7 @@ requires = ["maturin>=1.4,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "uringloop"
+name = "uringcore"
 version = "0.1.0"
 description = "Completion-driven asyncio event loop using io_uring"
 readme = "README.md"
@@ -39,7 +39,7 @@ dev = [
 [tool.maturin]
 features = ["pyo3/extension-module"]
 python-source = "python"
-module-name = "uringloop._core"
+module-name = "uringcore._core"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

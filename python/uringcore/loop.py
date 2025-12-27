@@ -56,9 +56,13 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Debug mode
         self._debug = False
         
-        # epoll for eventfd only (minimal, not selector)
+        # epoll for eventfd and reader/writer callbacks
         self._epoll = select.epoll()
         self._epoll.register(self._core.event_fd, select.EPOLLIN)
+        
+        # Reader/writer callbacks: fd -> (callback, args)
+        self._readers: Dict[int, Tuple[Callable, tuple]] = {}
+        self._writers: Dict[int, Tuple[Callable, tuple]] = {}
 
     def _check_closed(self):
         """Check if the loop is closed and raise if so."""
@@ -162,13 +166,23 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         """Run one iteration of the event loop."""
         timeout = self._calculate_timeout()
         
-        # Wait for eventfd signal (io_uring completions ready)
+        # Wait for epoll events (eventfd + reader/writer FDs)
         events = self._epoll.poll(timeout)
         
-        # Process completions if signaled
-        if events:
-            self._core.drain_eventfd()
-            self._process_completions()
+        # Process events
+        for fd, event_mask in events:
+            if fd == self._core.event_fd:
+                # io_uring completion signal
+                self._core.drain_eventfd()
+                self._process_completions()
+            else:
+                # Reader/writer callback
+                if event_mask & select.EPOLLIN and fd in self._readers:
+                    callback, args = self._readers[fd]
+                    self._ready.append(asyncio.Handle(callback, args, self))
+                if event_mask & select.EPOLLOUT and fd in self._writers:
+                    callback, args = self._writers[fd]
+                    self._ready.append(asyncio.Handle(callback, args, self))
         
         # Process scheduled callbacks
         self._process_scheduled()
@@ -331,6 +345,108 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     def time(self):
         """Return the current time."""
         return time.monotonic()
+
+    # =========================================================================
+    # File descriptor callbacks (add_reader/add_writer)
+    # =========================================================================
+
+    def add_reader(self, fd, callback, *args):
+        """Start watching a file descriptor for read availability."""
+        self._check_closed()
+        if hasattr(fd, 'fileno'):
+            fd = fd.fileno()
+        
+        # Remove existing reader if any
+        self._remove_reader_no_check(fd)
+        
+        # Register with epoll for reading
+        try:
+            mask = select.EPOLLIN
+            if fd in self._writers:
+                mask |= select.EPOLLOUT
+                self._epoll.modify(fd, mask)
+            else:
+                self._epoll.register(fd, mask)
+        except FileExistsError:
+            self._epoll.modify(fd, mask)
+        
+        self._readers[fd] = (callback, args)
+
+    def remove_reader(self, fd) -> bool:
+        """Stop watching a file descriptor for read availability."""
+        if hasattr(fd, 'fileno'):
+            fd = fd.fileno()
+        return self._remove_reader_no_check(fd)
+
+    def _remove_reader_no_check(self, fd) -> bool:
+        """Internal: remove reader without closed check."""
+        if fd not in self._readers:
+            return False
+        
+        del self._readers[fd]
+        
+        # Update epoll registration
+        if fd in self._writers:
+            try:
+                self._epoll.modify(fd, select.EPOLLOUT)
+            except (FileNotFoundError, OSError):
+                pass
+        else:
+            try:
+                self._epoll.unregister(fd)
+            except (FileNotFoundError, OSError):
+                pass
+        
+        return True
+
+    def add_writer(self, fd, callback, *args):
+        """Start watching a file descriptor for write availability."""
+        self._check_closed()
+        if hasattr(fd, 'fileno'):
+            fd = fd.fileno()
+        
+        # Remove existing writer if any
+        self._remove_writer_no_check(fd)
+        
+        # Register with epoll for writing
+        try:
+            mask = select.EPOLLOUT
+            if fd in self._readers:
+                mask |= select.EPOLLIN
+                self._epoll.modify(fd, mask)
+            else:
+                self._epoll.register(fd, mask)
+        except FileExistsError:
+            self._epoll.modify(fd, mask)
+        
+        self._writers[fd] = (callback, args)
+
+    def remove_writer(self, fd) -> bool:
+        """Stop watching a file descriptor for write availability."""
+        if hasattr(fd, 'fileno'):
+            fd = fd.fileno()
+        return self._remove_writer_no_check(fd)
+
+    def _remove_writer_no_check(self, fd) -> bool:
+        """Internal: remove writer without closed check."""
+        if fd not in self._writers:
+            return False
+        
+        del self._writers[fd]
+        
+        # Update epoll registration
+        if fd in self._readers:
+            try:
+                self._epoll.modify(fd, select.EPOLLIN)
+            except (FileNotFoundError, OSError):
+                pass
+        else:
+            try:
+                self._epoll.unregister(fd)
+            except (FileNotFoundError, OSError):
+                pass
+        
+        return True
 
     # =========================================================================
     # Future/Task creation

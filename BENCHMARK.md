@@ -2,118 +2,95 @@
 
 ## Overview
 
-This document presents performance measurements comparing uringcore against uvloop and the standard asyncio event loop. The benchmarks focus on core event loop operations to isolate the overhead introduced by each implementation.
+This document presents performance measurements comparing uringcore, uvloop, and standard asyncio. All values represent actual measurements from the benchmark suite.
 
 ## Methodology
 
-All benchmarks execute on Linux systems with kernel 5.11+ to ensure io_uring support. Each test runs multiple iterations to reduce measurement variance, with results reported as mean values with standard deviation.
+All benchmarks execute on Linux systems with kernel 5.11+. Each test runs multiple iterations with warmup, and garbage collection is disabled during measurement to reduce variance.
 
 ### Test Environment
 
 - **Platform**: Linux x86_64
-- **Python**: 3.10+
-- **Kernel**: 5.11+ (required for `IORING_OP_PROVIDE_BUFFERS`)
+- **Python**: 3.13.3
+- **Measurement**: `time.perf_counter_ns()` with GC disabled
 
 ### Benchmark Categories
 
-| Category | Description |
-|----------|-------------|
-| Sleep Zero | Measures minimal async context switch overhead |
-| Task Creation | Overhead of creating and awaiting a single task |
-| Gather (N) | Concurrent task scheduling with N parallel operations |
-| Queue Ops | asyncio.Queue put/get cycle |
-| Event Set/Wait | Event synchronization primitive |
-| Lock Acquire | asyncio.Lock acquisition and release |
-| Future Resolution | Future creation and result setting |
+| Category | Description | Iterations |
+|----------|-------------|------------|
+| sleep(0) | Minimal async context switch | 10,000 |
+| create_task | Task creation and await | 5,000 |
+| gather(10) | 10 concurrent tasks | 2,000 |
+| gather(100) | 100 concurrent tasks | 500 |
+| queue_put_get | asyncio.Queue cycle | 5,000 |
+| event_set_wait | Event synchronization | 10,000 |
+| lock_acquire | asyncio.Lock cycle | 10,000 |
+| future_result | Future resolution | 10,000 |
+| call_soon | Callback scheduling | 10,000 |
 
-## Results Summary
+## Results
 
-### Event Loop Comparison
-
-The following table presents average operation times in milliseconds. Lower values indicate better performance.
+### Measured Performance (µs per operation)
 
 | Benchmark | asyncio | uvloop | uringcore |
 |-----------|---------|--------|-----------|
-| sleep_zero | 0.045 | 0.012 | 0.010* |
-| create_task | 0.089 | 0.028 | 0.025* |
-| gather_10 | 0.156 | 0.048 | 0.042* |
-| gather_100 | 1.245 | 0.385 | 0.340* |
-| queue_ops | 0.067 | 0.021 | 0.019* |
-| event_wait | 0.054 | 0.016 | 0.014* |
-| lock_acquire | 0.048 | 0.015 | 0.013* |
-| future_set | 0.038 | 0.011 | 0.009* |
+| sleep(0) | 4.84 | 11.74 | 4.73 |
+| create_task | 6.09 | 12.89 | 6.11 |
+| gather(10) | 22.59 | 24.08 | 22.85 |
+| gather(100) | 162.51 | 115.76 | 169.05 |
+| queue_put_get | 4.43 | 12.77 | 4.88 |
+| event_set_wait | 3.77 | 11.68 | 4.09 |
+| lock_acquire | 3.95 | 11.01 | 4.22 |
+| future_result | 4.02 | 10.63 | 3.97 |
+| call_soon | 6.05 | 11.33 | 5.74 |
 
-*\* Projected values based on io_uring completion-driven architecture. Actual measurements may vary based on hardware and kernel configuration.*
+### Operations per Second
 
-### Speedup Analysis
+| Benchmark | asyncio | uvloop | uringcore |
+|-----------|---------|--------|-----------|
+| sleep(0) | 206,612 | 85,179 | 211,526 |
+| create_task | 164,204 | 77,580 | 163,772 |
+| gather(10) | 44,269 | 41,534 | 43,762 |
+| gather(100) | 6,153 | 8,639 | 5,915 |
+| queue_put_get | 225,734 | 78,326 | 204,812 |
+| event_set_wait | 265,252 | 85,588 | 244,249 |
+| lock_acquire | 253,165 | 90,817 | 237,238 |
+| future_result | 248,756 | 94,108 | 252,119 |
+| call_soon | 165,289 | 88,231 | 174,182 |
 
-Relative performance improvement over standard asyncio:
+## Analysis
 
-| Event Loop | Average Speedup | Peak Speedup |
-|------------|-----------------|--------------|
-| uvloop | 3.2x | 4.1x |
-| uringcore | 3.8x | 4.5x |
+### Observations
 
-### Key Observations
+1. **Pure Async Primitives**: For Python async primitives (tasks, futures, events, locks), asyncio and uringcore perform similarly. These operations are handled in Python, not by the event loop's I/O engine.
 
-1. **Completion-Driven Model**: The uringcore implementation eliminates syscall overhead on the hot path by using io_uring's completion queue. This architectural difference accounts for the performance improvement over uvloop's readiness-based approach.
+2. **uvloop Overhead**: uvloop shows higher latency for pure async primitives. uvloop is optimized for network I/O, where its libuv backend provides significant benefits over epoll.
 
-2. **Batched Submissions**: io_uring enables submission batching, reducing the number of kernel transitions during high-concurrency scenarios.
+3. **gather(100) Exception**: uvloop performs better on gather(100), likely due to its optimized task scheduling in libuv.
 
-3. **Zero-Copy Buffers**: Pre-registered buffer pools eliminate memory allocation overhead during I/O operations.
+### Where io_uring Provides Benefit
 
-## Network I/O Benchmarks
+The uringcore architecture provides performance improvements for:
 
-### Echo Server Throughput
+- **Network I/O**: Batched submissions and completions reduce syscalls
+- **High Concurrency**: Completion queue eliminates per-operation overhead  
+- **Zero-Copy**: Pre-registered buffers eliminate allocation/copy
 
-Requests per second for a minimal echo server handling 1KB payloads:
-
-| Concurrency | asyncio | uvloop | uringcore |
-|-------------|---------|--------|-----------|
-| 10 | 12,500 | 42,000 | 48,000 |
-| 100 | 45,000 | 125,000 | 145,000 |
-| 1000 | 85,000 | 210,000 | 255,000 |
-
-### Latency Distribution (p99)
-
-99th percentile latency in microseconds at 100 concurrent connections:
-
-| Event Loop | p50 | p99 | p99.9 |
-|------------|-----|-----|-------|
-| asyncio | 890 | 2,450 | 5,200 |
-| uvloop | 285 | 780 | 1,650 |
-| uringcore | 240 | 650 | 1,380 |
-
-## Syscall Analysis
-
-Using `strace` to measure kernel interactions during 10,000 echo requests:
-
-| Event Loop | epoll_wait | recv | send | io_uring_enter |
-|------------|------------|------|------|----------------|
-| asyncio | 10,847 | 10,000 | 10,000 | 0 |
-| uvloop | 1,245 | 10,000 | 10,000 | 0 |
-| uringcore | 0 | 0 | 0 | 128 |
-
-The uringcore implementation achieves near-zero per-operation syscalls by batching operations through io_uring's submission queue.
+These benefits are realized when the full network transport layer is integrated.
 
 ## Running Benchmarks
 
-Execute the benchmark suite:
-
 ```bash
 cd benchmarks
+pip install matplotlib uvloop  # Optional dependencies
 python benchmark_suite.py
 ```
 
-Results are saved to `benchmarks/results/` as JSON files for further analysis.
+### Output Files
 
-## Hardware Considerations
-
-Performance characteristics depend on:
-
-- **CPU Architecture**: io_uring benefits from modern CPUs with efficient memory ordering
-- **Kernel Version**: Newer kernels (5.15+) include io_uring optimizations
-- **SQPOLL Mode**: Polling mode (requires CAP_SYS_ADMIN) provides additional latency reduction
+- `results/latest.json` - Most recent results
+- `results/comparison_chart.png` - Bar chart comparison
+- `results/speedup_chart.png` - Speedup vs asyncio
 
 ## References
 

@@ -568,6 +568,63 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         return server
 
     # =========================================================================
+    # UDP Datagram Endpoint
+    # =========================================================================
+
+    async def create_datagram_endpoint(
+        self,
+        protocol_factory,
+        local_addr=None,
+        remote_addr=None,
+        *,
+        family=0,
+        proto=0,
+        flags=0,
+        reuse_port=None,
+        allow_broadcast=None,
+        sock=None,
+    ):
+        """Create a datagram (UDP) endpoint.
+        
+        Returns (transport, protocol) tuple.
+        """
+        self._check_closed()
+        
+        if sock is not None:
+            # Use provided socket
+            if local_addr or remote_addr:
+                raise ValueError("socket and host/port cannot both be specified")
+        else:
+            # Create socket based on addresses
+            if family == 0:
+                family = socket.AF_INET
+            
+            sock = socket.socket(family, socket.SOCK_DGRAM, proto)
+            sock.setblocking(False)
+            
+            if reuse_port:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            if allow_broadcast:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            
+            if local_addr:
+                sock.bind(local_addr)
+            
+            if remote_addr:
+                sock.connect(remote_addr)
+        
+        # Create protocol and transport
+        protocol = protocol_factory()
+        
+        from uringcore.datagram import UringDatagramTransport
+        transport = UringDatagramTransport(self, sock, protocol, remote_addr)
+        
+        # Notify protocol
+        protocol.connection_made(transport)
+        
+        return transport, protocol
+
+    # =========================================================================
     # Client connection (Pure io_uring)
     # =========================================================================
 

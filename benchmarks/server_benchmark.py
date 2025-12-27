@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
-"""Realistic server benchmarks comparing event loop implementations.
+"""uringcore Server Benchmark Suite - Scientific Rigor Edition.
 
-This module benchmarks actual network I/O performance using:
-1. TCP echo server (raw sockets)
-2. HTTP server simulation
+This benchmark measures realistic server performance with:
+- Exact system information for reproducibility
+- Proper warmup to eliminate JIT bias
+- Randomized test ordering
+- Long I/O workloads
+- High concurrency tests
 
+Copyright (c) 2024 Ankit Kumar Pandey
 SPDX-License-Identifier: Apache-2.0
-Copyright 2024 Ankit Kumar Pandey <ankitkpandey1@gmail.com>
 """
 
 import asyncio
 import gc
-import json
+import os
+import platform
+import random
 import socket
 import statistics
+import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Dict, List, Optional, Tuple
+import json
 
-# Check for uvloop
 try:
     import uvloop
     UVLOOP_AVAILABLE = True
@@ -30,64 +36,123 @@ except ImportError:
     UVLOOP_AVAILABLE = False
 
 
-@dataclass
-class ServerBenchmarkResult:
-    """Container for server benchmark results."""
-    name: str
-    loop_type: str
-    total_requests: int
-    duration_sec: float
-    requests_per_sec: float
-    avg_latency_us: float
-    min_latency_us: float
-    max_latency_us: float
-    p50_latency_us: float
-    p99_latency_us: float
+# =============================================================================
+# System Information
+# =============================================================================
 
-
-def find_free_port() -> int:
-    """Find a free port on localhost."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('127.0.0.1', 0))
-        return s.getsockname()[1]
-
-
-# ============================================================================
-# TCP Echo Server Benchmark
-# ============================================================================
-
-async def echo_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Handle a single echo connection."""
+def get_system_info() -> Dict[str, str]:
+    """Collect exact system information for reproducibility."""
+    info = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "python_version": sys.version,
+        "python_implementation": platform.python_implementation(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+    }
+    
+    # Kernel version
     try:
-        while True:
-            data = await reader.read(1024)
-            if not data:
-                break
-            writer.write(data)
-            await writer.drain()
+        info["kernel"] = platform.release()
+        # Get more detailed kernel info
+        result = subprocess.run(["uname", "-a"], capture_output=True, text=True)
+        info["uname"] = result.stdout.strip()
     except Exception:
         pass
-    finally:
-        writer.close()
+    
+    # CPU info
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    info["cpu_model"] = line.split(":")[1].strip()
+                    break
+        info["cpu_count"] = os.cpu_count()
+    except Exception:
+        pass
+    
+    # io_uring support
+    try:
+        import uringcore
+        core = uringcore.UringCore()
+        info["io_uring_available"] = True
+        info["sqpoll_enabled"] = core.sqpoll_enabled
+        info["uringcore_version"] = uringcore.__version__
+        core.shutdown()
+    except Exception as e:
+        info["io_uring_available"] = False
+        info["io_uring_error"] = str(e)
+    
+    return info
+
+
+def print_system_info(info: Dict[str, str]):
+    """Print system information."""
+    print("=" * 70)
+    print("SYSTEM INFORMATION")
+    print("=" * 70)
+    print(f"Timestamp:     {info.get('timestamp', 'N/A')}")
+    print(f"Python:        {info.get('python_version', 'N/A').split()[0]}")
+    print(f"Kernel:        {info.get('kernel', 'N/A')}")
+    print(f"CPU:           {info.get('cpu_model', 'N/A')}")
+    print(f"CPU Count:     {info.get('cpu_count', 'N/A')}")
+    print(f"io_uring:      {'Available' if info.get('io_uring_available') else 'Not Available'}")
+    print(f"SQPOLL:        {'Enabled' if info.get('sqpoll_enabled') else 'Disabled'}")
+    print(f"uringcore:     {info.get('uringcore_version', 'N/A')}")
+    print("=" * 70)
+
+
+# =============================================================================
+# Benchmark Results
+# =============================================================================
+
+@dataclass
+class BenchmarkResult:
+    """Result of a single benchmark run."""
+    name: str
+    loop_type: str
+    requests_per_sec: float
+    latency_p50_us: float
+    latency_p99_us: float
+    latency_mean_us: float
+    total_requests: int
+    duration_seconds: float
+    errors: int = 0
+
+
+# =============================================================================
+# Echo Server and Client
+# =============================================================================
+
+async def run_echo_server(port: int) -> asyncio.AbstractServer:
+    """Start a simple echo server."""
+    async def handle_client(reader, writer):
         try:
-            await writer.wait_closed()
+            while True:
+                data = await reader.read(65536)
+                if not data:
+                    break
+                writer.write(data)
+                await writer.drain()
         except Exception:
             pass
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+    
+    server = await asyncio.start_server(handle_client, '127.0.0.1', port)
+    return server
 
 
-async def run_echo_server(port: int, ready_event: asyncio.Event):
-    """Run echo server and signal when ready."""
-    server = await asyncio.start_server(echo_handler, '127.0.0.1', port)
-    ready_event.set()
-    async with server:
-        await server.serve_forever()
-
-
-def echo_client_sync(port: int, num_requests: int, payload: bytes) -> list[float]:
-    """Synchronous echo client that measures latency."""
+def echo_client_sync(port: int, num_requests: int, payload: bytes) -> List[float]:
+    """Synchronous echo client measuring per-request latency."""
     latencies = []
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(2.0)  # 2 second timeout
+    sock.settimeout(5.0)
+    
     try:
         sock.connect(('127.0.0.1', port))
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -97,15 +162,14 @@ def echo_client_sync(port: int, num_requests: int, payload: bytes) -> list[float
             sock.sendall(payload)
             received = b''
             while len(received) < len(payload):
-                try:
-                    chunk = sock.recv(1024)
-                    if not chunk:
-                        break
-                    received += chunk
-                except socket.timeout:
+                chunk = sock.recv(65536)
+                if not chunk:
                     break
+                received += chunk
             end = time.perf_counter_ns()
-            latencies.append((end - start) / 1000)  # Convert to µs
+            
+            if len(received) == len(payload):
+                latencies.append((end - start) / 1000)  # ns -> µs
     except Exception:
         pass
     finally:
@@ -116,26 +180,32 @@ def echo_client_sync(port: int, num_requests: int, payload: bytes) -> list[float
 
 async def benchmark_echo_server(
     loop_type: str,
-    num_clients: int = 10,
-    requests_per_client: int = 1000,
-    payload_size: int = 64
-) -> ServerBenchmarkResult:
-    """Benchmark echo server with multiple concurrent clients."""
-    port = find_free_port()
+    num_clients: int,
+    requests_per_client: int,
+    payload_size: int,
+    warmup_requests: int = 50,
+) -> BenchmarkResult:
+    """Benchmark echo server with specified parameters."""
+    port = random.randint(30000, 40000)
     payload = b'x' * payload_size
     
     # Start server
-    ready_event = asyncio.Event()
-    server_task = asyncio.create_task(run_echo_server(port, ready_event))
-    await ready_event.wait()
+    server = await run_echo_server(port)
+    await asyncio.sleep(0.05)  # Let server settle
     
-    # Wait for server to be fully ready
-    await asyncio.sleep(0.1)
+    # Warmup phase (critical for eliminating JIT bias)
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        warmup_futures = [
+            loop.run_in_executor(executor, echo_client_sync, port, warmup_requests, payload)
+            for _ in range(2)
+        ]
+        await asyncio.gather(*warmup_futures)
     
-    # Run clients in thread pool without blocking the loop
+    # Actual benchmark
+    gc.disable()
     all_latencies = []
     start_time = time.perf_counter()
-    loop = asyncio.get_running_loop()
     
     with ThreadPoolExecutor(max_workers=num_clients) as executor:
         futures = [
@@ -147,337 +217,326 @@ async def benchmark_echo_server(
             all_latencies.extend(res)
     
     end_time = time.perf_counter()
+    gc.enable()
+    
+    server.close()
+    await server.wait_closed()
+    
     duration = end_time - start_time
-    
-    # Stop server
-    server_task.cancel()
-    try:
-        await server_task
-    except asyncio.CancelledError:
-        pass
-    
-    # Calculate statistics
     total_requests = len(all_latencies)
+    
+    if total_requests == 0:
+        return BenchmarkResult(
+            name=f"echo_{payload_size}b",
+            loop_type=loop_type,
+            requests_per_sec=0,
+            latency_p50_us=0,
+            latency_p99_us=0,
+            latency_mean_us=0,
+            total_requests=0,
+            duration_seconds=duration,
+            errors=num_clients * requests_per_client,
+        )
+    
     sorted_latencies = sorted(all_latencies)
     
-    return ServerBenchmarkResult(
-        name=f"echo_server_{payload_size}b",
+    return BenchmarkResult(
+        name=f"echo_{payload_size}b",
         loop_type=loop_type,
-        total_requests=total_requests,
-        duration_sec=duration,
         requests_per_sec=total_requests / duration,
-        avg_latency_us=statistics.mean(all_latencies),
-        min_latency_us=min(all_latencies),
-        max_latency_us=max(all_latencies),
-        p50_latency_us=sorted_latencies[int(len(sorted_latencies) * 0.50)],
-        p99_latency_us=sorted_latencies[int(len(sorted_latencies) * 0.99)],
+        latency_p50_us=sorted_latencies[len(sorted_latencies) // 2],
+        latency_p99_us=sorted_latencies[int(len(sorted_latencies) * 0.99)],
+        latency_mean_us=statistics.mean(all_latencies),
+        total_requests=total_requests,
+        duration_seconds=duration,
+        errors=num_clients * requests_per_client - total_requests,
     )
 
 
-# ============================================================================
-# HTTP-like Request Benchmark
-# ============================================================================
+# =============================================================================
+# Long I/O Benchmark (10MB transfer)
+# =============================================================================
 
-HTTP_RESPONSE = b'HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!'
-HTTP_REQUEST = b'GET / HTTP/1.1\r\nHost: localhost\r\n\r\n'
-
-
-async def http_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Handle HTTP-like requests."""
-    try:
-        while True:
-            data = await reader.read(1024)
-            if not data:
-                break
-            # Simple HTTP response
-            writer.write(HTTP_RESPONSE)
-            await writer.drain()
-    except Exception:
-        pass
-    finally:
-        writer.close()
-        try:
-            await writer.wait_closed()
-        except Exception:
-            pass
-
-
-async def run_http_server(port: int, ready_event: asyncio.Event):
-    """Run HTTP-like server."""
-    server = await asyncio.start_server(http_handler, '127.0.0.1', port)
-    ready_event.set()
-    async with server:
-        await server.serve_forever()
-
-
-def http_client_sync(port: int, num_requests: int) -> list[float]:
-    """Synchronous HTTP client."""
-    latencies = []
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(2.0)
-    try:
-        sock.connect(('127.0.0.1', port))
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        
-        for _ in range(num_requests):
-            start = time.perf_counter_ns()
-            sock.sendall(HTTP_REQUEST)
-            received = b''
-            while b'\r\n\r\n' not in received or len(received) < len(HTTP_RESPONSE):
-                try:
-                    chunk = sock.recv(1024)
-                    if not chunk:
-                        break
-                    received += chunk
-                    if len(received) >= len(HTTP_RESPONSE):
-                        break
-                except socket.timeout:
-                    break
-            end = time.perf_counter_ns()
-            latencies.append((end - start) / 1000)
-    except Exception:
-        pass
-    finally:
-        sock.close()
-    
-    return latencies
-
-
-async def benchmark_http_server(
+async def benchmark_large_transfer(
     loop_type: str,
-    num_clients: int = 10,
-    requests_per_client: int = 1000
-) -> ServerBenchmarkResult:
-    """Benchmark HTTP-like server."""
-    port = find_free_port()
+    transfer_size_mb: int = 10,
+    num_transfers: int = 5,
+) -> BenchmarkResult:
+    """Benchmark large data transfers."""
+    port = random.randint(40000, 50000)
+    data_size = transfer_size_mb * 1024 * 1024
+    payload = b'x' * data_size
     
-    ready_event = asyncio.Event()
-    server_task = asyncio.create_task(run_http_server(port, ready_event))
-    await ready_event.wait()
-    await asyncio.sleep(0.1)
+    # Simple echo server for large data
+    server = await run_echo_server(port)
+    await asyncio.sleep(0.05)
     
-    all_latencies = []
+    gc.disable()
+    latencies = []
+    errors = 0
     start_time = time.perf_counter()
-    loop = asyncio.get_running_loop()
     
-    with ThreadPoolExecutor(max_workers=num_clients) as executor:
-        futures = [
-            loop.run_in_executor(executor, http_client_sync, port, requests_per_client)
-            for _ in range(num_clients)
-        ]
-        results = await asyncio.gather(*futures)
-        for res in results:
-            all_latencies.extend(res)
+    for _ in range(num_transfers):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(30.0)  # Longer timeout for large transfers
+        
+        try:
+            sock.connect(('127.0.0.1', port))
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 1024 * 1024)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024 * 1024)
+            
+            transfer_start = time.perf_counter_ns()
+            
+            # Send all data
+            sock.sendall(payload)
+            
+            # Receive all data
+            received = b''
+            while len(received) < len(payload):
+                chunk = sock.recv(1024 * 1024)
+                if not chunk:
+                    break
+                received += chunk
+            
+            transfer_end = time.perf_counter_ns()
+            
+            if len(received) == len(payload):
+                latencies.append((transfer_end - transfer_start) / 1_000_000)  # ms
+            else:
+                errors += 1
+        except Exception:
+            errors += 1
+        finally:
+            sock.close()
     
     end_time = time.perf_counter()
+    gc.enable()
+    
+    server.close()
+    await server.wait_closed()
+    
     duration = end_time - start_time
+    successful = len(latencies)
     
-    server_task.cancel()
-    try:
-        await server_task
-    except asyncio.CancelledError:
-        pass
+    if successful == 0:
+        return BenchmarkResult(
+            name=f"transfer_{transfer_size_mb}mb",
+            loop_type=loop_type,
+            requests_per_sec=0,
+            latency_p50_us=0,
+            latency_p99_us=0,
+            latency_mean_us=0,
+            total_requests=0,
+            duration_seconds=duration,
+            errors=errors,
+        )
     
-    total_requests = len(all_latencies)
-    sorted_latencies = sorted(all_latencies)
+    sorted_latencies = sorted(latencies)
+    throughput_mbps = (successful * transfer_size_mb) / duration
     
-    return ServerBenchmarkResult(
-        name="http_server",
+    return BenchmarkResult(
+        name=f"transfer_{transfer_size_mb}mb",
         loop_type=loop_type,
-        total_requests=total_requests,
-        duration_sec=duration,
-        requests_per_sec=total_requests / duration,
-        avg_latency_us=statistics.mean(all_latencies),
-        min_latency_us=min(all_latencies),
-        max_latency_us=max(all_latencies),
-        p50_latency_us=sorted_latencies[int(len(sorted_latencies) * 0.50)],
-        p99_latency_us=sorted_latencies[int(len(sorted_latencies) * 0.99)],
+        requests_per_sec=throughput_mbps,  # MB/s for this benchmark
+        latency_p50_us=sorted_latencies[len(sorted_latencies) // 2] * 1000,  # ms -> µs
+        latency_p99_us=sorted_latencies[-1] * 1000 if sorted_latencies else 0,
+        latency_mean_us=statistics.mean(latencies) * 1000 if latencies else 0,
+        total_requests=successful,
+        duration_seconds=duration,
+        errors=errors,
     )
 
 
-# ============================================================================
-# Benchmark Runner
-# ============================================================================
+# =============================================================================
+# High Concurrency Benchmark
+# =============================================================================
 
-def run_server_benchmarks_with_loop(
+async def benchmark_high_concurrency(
     loop_type: str,
-    loop_factory: Callable
-) -> list[ServerBenchmarkResult]:
-    """Run all server benchmarks with a specific event loop."""
+    num_connections: int = 100,
+    requests_per_connection: int = 10,
+) -> BenchmarkResult:
+    """Benchmark with many concurrent connections."""
+    return await benchmark_echo_server(
+        loop_type=loop_type,
+        num_clients=num_connections,
+        requests_per_client=requests_per_connection,
+        payload_size=64,
+        warmup_requests=10,
+    )
+
+
+# =============================================================================
+# Benchmark Runner
+# =============================================================================
+
+def run_benchmarks_with_loop(loop_type: str, loop_factory: Callable) -> List[BenchmarkResult]:
+    """Run all benchmarks with a specific loop type."""
     results = []
     
-    # Echo server benchmarks
-    for payload_size in [64, 1024]:
-        loop = loop_factory()
-        asyncio.set_event_loop(loop)
-        gc.collect()
-        
-        try:
-            result = loop.run_until_complete(
-                benchmark_echo_server(
-                    loop_type,
-                    num_clients=10,
-                    requests_per_client=50,
-                    payload_size=payload_size
-                )
-            )
-            results.append(result)
-            print(f"  {result.name}: {result.requests_per_sec:.0f} req/s, "
-                  f"p99={result.p99_latency_us:.0f}µs")
-        finally:
-            loop.close()
-    
-    # HTTP server benchmark
     loop = loop_factory()
     asyncio.set_event_loop(loop)
-    gc.collect()
     
     try:
+        # Echo 64B
         result = loop.run_until_complete(
-            benchmark_http_server(loop_type, num_clients=10, requests_per_client=50)
+            benchmark_echo_server(loop_type, num_clients=10, requests_per_client=100, payload_size=64)
         )
         results.append(result)
-        print(f"  {result.name}: {result.requests_per_sec:.0f} req/s, "
-              f"p99={result.p99_latency_us:.0f}µs")
+        print(f"  {result.name}: {result.requests_per_sec:.0f} req/s, p99={result.latency_p99_us:.0f}µs")
+        
+        # Echo 1KB
+        result = loop.run_until_complete(
+            benchmark_echo_server(loop_type, num_clients=10, requests_per_client=100, payload_size=1024)
+        )
+        results.append(result)
+        print(f"  {result.name}: {result.requests_per_sec:.0f} req/s, p99={result.latency_p99_us:.0f}µs")
+        
+        # Large transfer 10MB
+        result = loop.run_until_complete(
+            benchmark_large_transfer(loop_type, transfer_size_mb=10, num_transfers=3)
+        )
+        results.append(result)
+        print(f"  {result.name}: {result.requests_per_sec:.1f} MB/s, p99={result.latency_p99_us/1000:.0f}ms")
+        
+        # High concurrency
+        result = loop.run_until_complete(
+            benchmark_high_concurrency(loop_type, num_connections=50, requests_per_connection=20)
+        )
+        result.name = "concurrent_50"
+        results.append(result)
+        print(f"  {result.name}: {result.requests_per_sec:.0f} req/s, p99={result.latency_p99_us:.0f}µs")
+        
     finally:
         loop.close()
     
     return results
 
 
-def run_all_server_benchmarks() -> dict:
-    """Run server benchmarks for all available event loops."""
+def run_all_benchmarks() -> Dict:
+    """Run benchmarks for all available loop types in randomized order."""
+    system_info = get_system_info()
+    print_system_info(system_info)
+    
     results = {
-        "metadata": {
-            "timestamp": datetime.now().isoformat(),
-            "python_version": sys.version,
-            "platform": sys.platform,
-            "benchmark_type": "server",
-        },
-        "benchmarks": {}
+        "system_info": system_info,
+        "benchmarks": {},
     }
     
-    # Standard asyncio
-    print("\n[asyncio] Running server benchmarks...")
-    results["benchmarks"]["asyncio"] = [
-        asdict(r) for r in run_server_benchmarks_with_loop("asyncio", asyncio.new_event_loop)
+    # Define loop types
+    loop_configs = [
+        ("asyncio", asyncio.new_event_loop),
     ]
     
-    # uvloop
     if UVLOOP_AVAILABLE:
-        print("\n[uvloop] Running server benchmarks...")
-        results["benchmarks"]["uvloop"] = [
-            asdict(r) for r in run_server_benchmarks_with_loop("uvloop", uvloop.new_event_loop)
-        ]
+        loop_configs.append(("uvloop", uvloop.new_event_loop))
     
-    # uringcore
     try:
         import uringcore
-        print("\n[uringcore] Running server benchmarks...")
-        results["benchmarks"]["uringcore"] = [
-            asdict(r) for r in run_server_benchmarks_with_loop(
-                "uringcore", 
-                lambda: uringcore.EventLoopPolicy().new_event_loop()
-            )
-        ]
-    except ImportError as e:
-        print(f"Skipping uringcore: {e}")
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Error running uringcore: {e}")
+        loop_configs.append(("uringcore", lambda: uringcore.EventLoopPolicy().new_event_loop()))
+    except ImportError:
+        pass
+    
+    # Randomize order to eliminate systematic bias
+    random.shuffle(loop_configs)
+    print(f"\nBenchmark order: {[c[0] for c in loop_configs]}")
+    
+    for loop_type, loop_factory in loop_configs:
+        print(f"\n[{loop_type}] Running benchmarks...")
+        try:
+            benchmark_results = run_benchmarks_with_loop(loop_type, loop_factory)
+            results["benchmarks"][loop_type] = [asdict(r) for r in benchmark_results]
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Error running {loop_type}: {e}")
     
     return results
 
 
-def print_server_comparison(results: dict):
-    """Print server benchmark comparison."""
+def print_comparison(results: Dict):
+    """Print comparison table."""
     benchmarks = results.get("benchmarks", {})
     if not benchmarks:
         return
     
     loops = list(benchmarks.keys())
-    first_loop = loops[0]
-    bench_names = [b["name"] for b in benchmarks[first_loop]]
     
-    print("\n" + "=" * 90)
-    print("Server Performance Comparison")
-    print("=" * 90)
+    # Get all benchmark names
+    all_names = set()
+    for loop_results in benchmarks.values():
+        for r in loop_results:
+            all_names.add(r["name"])
     
-    # Requests per second
-    print("\nRequests per Second (higher is better):")
-    header = f"{'Benchmark':<20}"
-    for loop in loops:
-        header += f" | {loop:>12}"
+    print("\n" + "=" * 80)
+    print("BENCHMARK COMPARISON")
+    print("=" * 80)
+    
+    # Throughput table
+    print("\nThroughput (higher is better):")
+    header = "Benchmark".ljust(20) + "".join(f" | {l:>12}" for l in loops)
     print(header)
     print("-" * len(header))
     
-    for bench_name in bench_names:
-        row = f"{bench_name:<20}"
+    for name in sorted(all_names):
+        row = name.ljust(20)
         for loop in loops:
-            for b in benchmarks[loop]:
-                if b["name"] == bench_name:
-                    row += f" | {b['requests_per_sec']:>10.0f}/s"
-                    break
+            loop_results = benchmarks.get(loop, [])
+            result = next((r for r in loop_results if r["name"] == name), None)
+            if result:
+                if "transfer" in name:
+                    row += f" | {result['requests_per_sec']:>10.1f}/s"
+                else:
+                    row += f" | {result['requests_per_sec']:>10.0f}/s"
+            else:
+                row += " |        N/A"
         print(row)
     
-    # P99 Latency
+    # Latency table
     print("\nP99 Latency (lower is better):")
-    header = f"{'Benchmark':<20}"
-    for loop in loops:
-        header += f" | {loop:>12}"
+    header = "Benchmark".ljust(20) + "".join(f" | {l:>12}" for l in loops)
     print(header)
     print("-" * len(header))
     
-    for bench_name in bench_names:
-        row = f"{bench_name:<20}"
+    for name in sorted(all_names):
+        row = name.ljust(20)
         for loop in loops:
-            for b in benchmarks[loop]:
-                if b["name"] == bench_name:
-                    row += f" | {b['p99_latency_us']:>10.0f}µs"
-                    break
+            loop_results = benchmarks.get(loop, [])
+            result = next((r for r in loop_results if r["name"] == name), None)
+            if result:
+                if "transfer" in name:
+                    row += f" | {result['latency_p99_us']/1000:>10.0f}ms"
+                else:
+                    row += f" | {result['latency_p99_us']:>10.0f}µs"
+            else:
+                row += " |        N/A"
         print(row)
     
-    print("=" * 90)
-
-
-def save_server_results(results: dict, output_dir: Path = None) -> Path:
-    """Save server benchmark results."""
-    if output_dir is None:
-        output_dir = Path(__file__).parent / "results"
-    
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = output_dir / f"server_benchmark_{timestamp}.json"
-    
-    with open(filename, "w") as f:
-        json.dump(results, f, indent=2)
-    
-    latest = output_dir / "server_latest.json"
-    with open(latest, "w") as f:
-        json.dump(results, f, indent=2)
-    
-    print(f"\nResults saved to {filename}")
-    return filename
+    print("=" * 80)
 
 
 def main():
     """Main entry point."""
-    print("=" * 60)
-    print("uringcore Server Benchmark Suite")
-    print("=" * 60)
-    print(f"Python: {sys.version}")
-    print(f"Platform: {sys.platform}")
+    print("=" * 70)
+    print("uringcore Server Benchmark Suite - Scientific Rigor Edition")
+    print("=" * 70)
     
-    results = run_all_server_benchmarks()
+    results = run_all_benchmarks()
+    print_comparison(results)
     
-    output_dir = Path(__file__).parent / "results"
-    save_server_results(results, output_dir)
+    # Save results
+    results_dir = Path(__file__).parent / "results"
+    results_dir.mkdir(exist_ok=True)
     
-    print_server_comparison(results)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    results_file = results_dir / f"benchmark_{timestamp}.json"
     
-    print("\nServer benchmark complete!")
+    with open(results_file, "w") as f:
+        json.dump(results, f, indent=2)
+    
+    print(f"\nResults saved to {results_file}")
+    print("\nBenchmark complete!")
 
 
 if __name__ == "__main__":

@@ -18,11 +18,11 @@ use crate::error::{Error, Result};
 /// Default buffer size (64KB - optimal for network I/O)
 pub const DEFAULT_BUFFER_SIZE: usize = 64 * 1024;
 
-/// Default number of buffers in the pool
-pub const DEFAULT_BUFFER_COUNT: usize = 256;
+/// Default number of buffers in the pool (enough for high concurrency)
+pub const DEFAULT_BUFFER_COUNT: usize = 1024;
 
-/// Quarantine duration before buffer reuse (safety margin for GC races)
-const QUARANTINE_DURATION: Duration = Duration::from_millis(5);
+/// Quarantine duration before buffer reuse (reduced for high throughput)
+const QUARANTINE_DURATION: Duration = Duration::from_millis(1);
 
 /// A reference to a buffer in the pool with offset tracking for partial reads.
 #[derive(Debug)]
@@ -237,6 +237,18 @@ impl BufferPool {
     pub unsafe fn get_buffer_slice(&self, index: u16, len: usize) -> &[u8] {
         let ptr = self.get_buffer_ptr(index);
         std::slice::from_raw_parts(ptr, len.min(self.buffer_size))
+    }
+
+    /// Get a mutable slice view of a buffer for writing.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the index is valid, the buffer is owned,
+    /// and len does not exceed the buffer size.
+    #[must_use]
+    pub unsafe fn get_buffer_slice_mut(&self, index: u16, len: usize) -> &mut [u8] {
+        let ptr = self.get_buffer_ptr(index) as *mut u8;
+        std::slice::from_raw_parts_mut(ptr, len.min(self.buffer_size))
     }
 
     /// Get the size of each buffer.

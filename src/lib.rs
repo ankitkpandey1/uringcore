@@ -56,6 +56,9 @@ use buffer::BufferPool;
 use ring::{OpType, Ring};
 use state::{FDStateManager, SocketType};
 
+use std::collections::HashMap;
+use parking_lot::Mutex;
+
 /// The main uringcore engine exposed to Python.
 #[pyclass]
 pub struct UringCore {
@@ -65,6 +68,8 @@ pub struct UringCore {
     buffer_pool: Arc<BufferPool>,
     /// FD state manager
     fd_states: FDStateManager,
+    /// Inflight recv buffers: fd -> buffer_index (for completion data extraction)
+    inflight_recv_buffers: Mutex<HashMap<i32, u16>>,
 }
 
 #[pymethods]
@@ -106,6 +111,7 @@ impl UringCore {
             ring,
             buffer_pool,
             fd_states: FDStateManager::new(),
+            inflight_recv_buffers: Mutex::new(HashMap::new()),
         })
     }
 
@@ -211,18 +217,15 @@ impl UringCore {
 
             // Create result tuple
             let tuple = if let Some(buf_idx) = cqe.buffer_index {
+                // RecvMulti case (not currently used)
                 if cqe.result > 0 {
-                    // Get buffer data as bytes
                     let data = unsafe {
                         self.buffer_pool
                             .get_buffer_slice(buf_idx, cqe.result as usize)
                     };
                     let py_bytes = PyBytes::new(py, data);
-
-                    // Return buffer to pool
                     self.buffer_pool
                         .release(buf_idx, self.buffer_pool.generation_id());
-
                     (
                         cqe.fd(),
                         op_type,
@@ -231,9 +234,39 @@ impl UringCore {
                     )
                         .into_pyobject(py)?
                 } else {
-                    // Error or EOF, still return buffer
                     self.buffer_pool
                         .release(buf_idx, self.buffer_pool.generation_id());
+                    (cqe.fd(), op_type, cqe.result, py.None()).into_pyobject(py)?
+                }
+            } else if cqe.op_type() == OpType::Recv {
+                // Recv with inflight buffer tracking
+                // Decrement inflight count to allow recv rearm
+                let _ = self.fd_states.with_state_mut(cqe.fd(), |s| s.on_completion_empty());
+                
+                if let Some(buf_idx) = self.inflight_recv_buffers.lock().remove(&cqe.fd()) {
+                    if cqe.result > 0 {
+                        let data = unsafe {
+                            self.buffer_pool
+                                .get_buffer_slice(buf_idx, cqe.result as usize)
+                        };
+                        let py_bytes = PyBytes::new(py, data);
+                        self.buffer_pool
+                            .release(buf_idx, self.buffer_pool.generation_id());
+                        (
+                            cqe.fd(),
+                            op_type,
+                            cqe.result,
+                            Some(py_bytes.into_pyobject(py)?),
+                        )
+                            .into_pyobject(py)?
+                    } else {
+                        // Error or EOF
+                        self.buffer_pool
+                            .release(buf_idx, self.buffer_pool.generation_id());
+                        (cqe.fd(), op_type, cqe.result, py.None()).into_pyobject(py)?
+                    }
+                } else {
+                    // No buffer tracked (shouldn't happen)
                     (cqe.fd(), op_type, cqe.result, py.None()).into_pyobject(py)?
                 }
             } else {
@@ -268,6 +301,132 @@ impl UringCore {
         self.ring
             .signal()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    // =========================================================================
+    // io_uring Submission Methods (Pure Async I/O)
+    // =========================================================================
+
+    /// Submit a receive operation for a file descriptor.
+    ///
+    /// Acquires a buffer from the pool and submits a recv operation.
+    /// The completion will be delivered via drain_completions().
+    fn submit_recv(&mut self, fd: i32) -> PyResult<()> {
+        // Check if FD should accept new submissions
+        if !self.fd_states.should_submit_recv(fd) {
+            return Ok(()); // Backpressure or paused
+        }
+
+        // Acquire a buffer from the pool
+        let buf_idx = self
+            .buffer_pool
+            .acquire()
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available for recv"))?;
+
+        // Get buffer pointer and size
+        let buf_ptr = unsafe { self.buffer_pool.get_buffer_ptr(buf_idx) as *mut u8 };
+        let buf_len = self.buffer_pool.buffer_size() as u32;
+
+        // Track inflight
+        self.fd_states
+            .with_state_mut(fd, |state| state.on_submit())
+            .map_err(|e| {
+                // Release buffer on error
+                self.buffer_pool.release(buf_idx, self.buffer_pool.generation_id());
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+            })?;
+
+        // Submit to ring
+        let gen = self.ring.generation_u16();
+        unsafe {
+            self.ring
+                .prep_recv(fd, buf_ptr, buf_len, buf_idx, gen)
+                .map_err(|e| {
+                    // Release buffer on error
+                    self.buffer_pool.release(buf_idx, self.buffer_pool.generation_id());
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+                })?;
+        }
+
+        // Track inflight buffer for this FD (for completion data extraction)
+        self.inflight_recv_buffers.lock().insert(fd, buf_idx);
+
+        // Flush to kernel
+        self.ring
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Submit a send operation for a file descriptor.
+    ///
+    /// The data is copied to a buffer and submitted to io_uring.
+    fn submit_send(&mut self, fd: i32, data: &[u8]) -> PyResult<()> {
+        // Acquire a buffer from the pool
+        let buf_idx = self
+            .buffer_pool
+            .acquire()
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available"))?;
+
+        // Copy data to buffer
+        let buf_slice = unsafe { self.buffer_pool.get_buffer_slice_mut(buf_idx, data.len()) };
+        buf_slice.copy_from_slice(data);
+
+        // Get buffer pointer
+        let buf_ptr = buf_slice.as_ptr();
+        let len = data.len() as u32;
+
+        // Submit to ring
+        let gen = self.ring.generation_u16();
+        unsafe {
+            self.ring
+                .prep_send(fd, buf_ptr, len, gen)
+                .map_err(|e| {
+                    // Release buffer on error
+                    self.buffer_pool.release(buf_idx, self.buffer_pool.generation_id());
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+                })?;
+        }
+
+        // Flush to kernel
+        self.ring
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Submit an accept operation for a listening socket.
+    ///
+    /// Uses ACCEPT_MULTI for efficient connection handling.
+    fn submit_accept(&mut self, fd: i32) -> PyResult<()> {
+        let gen = self.ring.generation_u16();
+        self.ring
+            .prep_accept(fd, gen)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        // Flush to kernel
+        self.ring
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Submit a close operation for a file descriptor.
+    fn submit_close(&mut self, fd: i32) -> PyResult<()> {
+        let gen = self.ring.generation_u16();
+        self.ring
+            .prep_close(fd, gen)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        // Flush to kernel
+        self.ring
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
     }
 
     /// Shutdown the engine.

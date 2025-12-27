@@ -163,6 +163,11 @@ impl Ring {
             EventFd::from_value_and_flags(0, EfdFlags::EFD_NONBLOCK | EfdFlags::EFD_CLOEXEC)
                 .map_err(|e| Error::EventFd(e.to_string()))?;
 
+        // Register eventfd with io_uring so completions signal it
+        ring.submitter()
+            .register_eventfd(event_fd.as_raw_fd())
+            .map_err(|e| Error::EventFd(format!("Failed to register eventfd: {e}")))?;
+
         Ok(Self {
             ring,
             event_fd,
@@ -292,18 +297,12 @@ impl Ring {
     ///
     /// Returns an error if submission fails.
     pub fn submit(&self) -> Result<usize> {
-        if self.sqpoll_enabled {
-            // With SQPOLL, the kernel polls automatically
-            // Just need to ensure submissions are visible
-            std::sync::atomic::fence(Ordering::SeqCst);
-            Ok(0)
-        } else {
-            // Without SQPOLL, need to call enter
-            self.ring
-                .submitter()
-                .submit()
-                .map_err(|e| Error::RingOp(format!("submit failed: {e}")))
-        }
+        // Always call submit to ensure operations are flushed to kernel
+        // Even with SQPOLL, we need io_uring_enter when the kernel thread is idle
+        self.ring
+            .submitter()
+            .submit()
+            .map_err(|e| Error::RingOp(format!("submit failed: {e}")))
     }
 
     /// Submit and wait for at least one completion.
@@ -354,15 +353,23 @@ impl Ring {
         f(&mut sq)
     }
 
-    /// Prepare a receive operation with buffer select.
+    /// Prepare a receive operation with a provided buffer.
     ///
     /// # Safety
     ///
-    /// The buffer group must be properly set up.
-    pub unsafe fn prep_recv(&mut self, fd: RawFd, buf_group: u16, generation: u16) -> Result<()> {
+    /// The buffer must remain valid until completion.
+    pub unsafe fn prep_recv(
+        &mut self,
+        fd: RawFd,
+        buf: *mut u8,
+        len: u32,
+        _buf_idx: u16,
+        generation: u16,
+    ) -> Result<()> {
         let user_data = encode_user_data(fd, OpType::Recv, generation);
 
-        let entry = opcode::RecvMulti::new(types::Fd(fd), buf_group)
+        // Use regular Recv with provided buffer
+        let entry = opcode::Recv::new(types::Fd(fd), buf, len)
             .build()
             .user_data(user_data);
 
@@ -406,7 +413,8 @@ impl Ring {
     pub fn prep_accept(&mut self, fd: RawFd, generation: u16) -> Result<()> {
         let user_data = encode_user_data(fd, OpType::Accept, generation);
 
-        let entry = opcode::AcceptMulti::new(types::Fd(fd))
+        // Use regular Accept instead of AcceptMulti for broader kernel compatibility
+        let entry = opcode::Accept::new(types::Fd(fd), std::ptr::null_mut(), std::ptr::null_mut())
             .build()
             .user_data(user_data);
 
@@ -414,7 +422,7 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            // SAFETY: AcceptMulti is safe to push
+            // SAFETY: Accept is safe to push
             unsafe {
                 sq.push(&entry)
                     .map_err(|_| Error::RingOp("push failed".into()))

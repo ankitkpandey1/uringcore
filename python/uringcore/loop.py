@@ -1,60 +1,602 @@
-"""UringEventLoop: Completion-driven asyncio event loop using io_uring."""
+"""UringEventLoop: Pure io_uring asyncio event loop.
+
+This module implements a completion-driven event loop that uses io_uring
+exclusively for I/O operations. No selector fallback.
+"""
+
 import asyncio
-import selectors
-import warnings
-from typing import Any, Dict, Optional
+import collections
+import heapq
+import os
+import select
+import socket
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 from uringcore._core import UringCore
 
-class UringEventLoop(asyncio.SelectorEventLoop):
-    """Event loop using io_uring for completions with selector fallback."""
+
+class UringEventLoop(asyncio.AbstractEventLoop):
+    """Pure io_uring event loop with no selector fallback.
     
-    def __init__(self, selector: Optional[selectors.BaseSelector] = None):
-        super().__init__(selector)
+    All I/O operations go through the io_uring submission queue.
+    Completions are delivered via eventfd signaling.
+    """
+
+    def __init__(self):
+        """Initialize the event loop."""
+        self._closed = False
+        self._stopping = False
+        self._running = False
         
-        # Initialize Rust core
+        # Initialize the Rust core
         self._core = UringCore()
         
-        # Register eventfd to wake up loop on completions
-        self.add_reader(self._core.event_fd, self._process_completions)
+        # Ready callbacks queue
+        self._ready: collections.deque = collections.deque()
         
-        # Mapping for uring-aware transports (fd -> transport)
-        self._uring_transports: Dict[int, Any] = {}
+        # Scheduled callbacks (heap of (time, handle))
+        self._scheduled: List[Tuple[float, asyncio.TimerHandle]] = []
+        
+        # Transport registry: fd -> transport
+        self._transports: Dict[int, Any] = {}
+        
+        # Server registry: fd -> (server, protocol_factory)
+        self._servers: Dict[int, Tuple[Any, Callable]] = {}
+        
+        # Pending send buffers: fd -> list of (data, future)
+        self._pending_sends: Dict[int, List[Tuple[bytes, asyncio.Future]]] = {}
+        
+        # Thread safety
+        self._thread_id: Optional[int] = None
+        
+        # Exception handler
+        self._exception_handler: Optional[Callable] = None
+        
+        # Debug mode
+        self._debug = False
+        
+        # epoll for eventfd only (minimal, not selector)
+        self._epoll = select.epoll()
+        self._epoll.register(self._core.event_fd, select.EPOLLIN)
 
-    def _process_completions(self):
-        """Process completions from the io_uring ring."""
-        # Drain the eventfd signal
-        self._core.drain_eventfd()
+    def _check_closed(self):
+        """Check if the loop is closed and raise if so."""
+        if self._closed:
+            raise RuntimeError("Event loop is closed")
+
+    def _check_running(self):
+        """Check if the loop is already running."""
+        if self._running:
+            raise RuntimeError("This event loop is already running")
+
+    # =========================================================================
+    # Running and stopping the event loop
+    # =========================================================================
+
+    def run_forever(self):
+        """Run the event loop until stop() is called."""
+        self._check_closed()
+        self._check_running()
         
-        # Process all available completions
-        for fd, op_type, result, data in self._core.drain_completions():
-            transport = self._uring_transports.get(fd)
-            if transport is not None:
-                if hasattr(transport, '_process_completion'):
-                    transport._process_completion(op_type, result, data)
+        self._running = True
+        self._thread_id = None
+        
+        # Set this loop as the running loop for asyncio compatibility
+        old_loop = asyncio._get_running_loop()
+        try:
+            asyncio._set_running_loop(self)
+            while not self._stopping:
+                self._run_once()
+        finally:
+            asyncio._set_running_loop(old_loop)
+            self._stopping = False
+            self._running = False
+            self._thread_id = None
+
+    def run_until_complete(self, future):
+        """Run until the future is complete."""
+        self._check_closed()
+        self._check_running()
+        
+        future = asyncio.ensure_future(future, loop=self)
+        future.add_done_callback(lambda _: self.stop())
+        
+        try:
+            self.run_forever()
+        except Exception:
+            if not future.done():
+                future.cancel()
+            raise
+        
+        if not future.done():
+            raise RuntimeError("Event loop stopped before Future completed")
+        
+        return future.result()
+
+    def stop(self):
+        """Stop the event loop."""
+        self._stopping = True
+
+    def is_running(self):
+        """Return True if the event loop is running."""
+        return self._running
+
+    def is_closed(self):
+        """Return True if the event loop is closed."""
+        return self._closed
 
     def close(self):
         """Close the event loop."""
-        if not self.is_closed():
-            try:
-                self.remove_reader(self._core.event_fd)
-                self._core.shutdown()
-            except Exception:
-                pass
-        super().close()
-
-    # =========================================================================
-    # io_uring Integration (Stub/Future Use)
-    # =========================================================================
-
-    def register_fd(self, fd: int, socket_type: str = "tcp"):
-        """Register a file descriptor with the io_uring engine."""
-        self._core.register_fd(fd, socket_type)
-
-    def unregister_fd(self, fd: int):
-        """Unregister a file descriptor."""
-        self._core.unregister_fd(fd)
-        self._uring_transports.pop(fd, None)
+        if self._running:
+            raise RuntimeError("Cannot close a running event loop")
+        if self._closed:
+            return
         
+        # Cleanup default executor
+        if hasattr(self, '_default_executor') and self._default_executor is not None:
+            self._default_executor.shutdown(wait=False)
+            self._default_executor = None
+        
+        self._epoll.unregister(self._core.event_fd)
+        self._epoll.close()
+        self._core.shutdown()
+        self._closed = True
+
+    async def shutdown_asyncgens(self):
+        """Shutdown all active asynchronous generators."""
+        # No-op: we don't track async generators yet
+        pass
+
+    async def shutdown_default_executor(self, wait=True):
+        """Shutdown the default executor."""
+        if hasattr(self, '_default_executor') and self._default_executor is not None:
+            self._default_executor.shutdown(wait=wait)
+            self._default_executor = None
+
+    # =========================================================================
+    # Internal: Running one iteration
+    # =========================================================================
+
+    def _run_once(self):
+        """Run one iteration of the event loop."""
+        timeout = self._calculate_timeout()
+        
+        # Wait for eventfd signal (io_uring completions ready)
+        events = self._epoll.poll(timeout)
+        
+        # Process completions if signaled
+        if events:
+            self._core.drain_eventfd()
+            self._process_completions()
+        
+        # Process scheduled callbacks
+        self._process_scheduled()
+        
+        # Process ready callbacks
+        self._process_ready()
+
+    def _calculate_timeout(self) -> float:
+        """Calculate the timeout for the next poll."""
+        if self._stopping:
+            return 0.0
+        
+        if self._ready:
+            return 0.0
+        
+        if self._scheduled:
+            now = time.monotonic()
+            next_time = self._scheduled[0][0]
+            timeout = max(0.0, next_time - now)
+            return min(timeout, 0.01)  # Cap at 10ms for responsiveness
+        
+        return 0.01  # 10ms default for fast io_uring responsiveness
+
+    def _process_completions(self):
+        """Process completions from the io_uring ring."""
+        completions = self._core.drain_completions()
+        
+        for fd, op_type, result, data in completions:
+            if op_type == "recv":
+                self._handle_recv_completion(fd, result, data)
+            elif op_type == "send":
+                self._handle_send_completion(fd, result)
+            elif op_type == "accept":
+                self._handle_accept_completion(fd, result)
+            elif op_type == "close":
+                self._handle_close_completion(fd, result)
+
+    def _handle_recv_completion(self, fd: int, result: int, data: Optional[bytes]):
+        """Handle a receive completion."""
+        transport = self._transports.get(fd)
+        if transport is None:
+            return
+        
+        if result > 0 and data:
+            # Data received - deliver to protocol
+            transport._data_received(data)
+            # Rearm receive
+            self._core.submit_recv(fd)
+        elif result == 0:
+            # EOF
+            transport._eof_received()
+        else:
+            # Error
+            transport._error_received(result)
+
+    def _handle_send_completion(self, fd: int, result: int):
+        """Handle a send completion."""
+        transport = self._transports.get(fd)
+        if transport is None:
+            return
+        
+        transport._send_completed(result)
+
+    def _handle_accept_completion(self, fd: int, result: int):
+        """Handle an accept completion."""
+        server_info = self._servers.get(fd)
+        if server_info is None:
+            return
+        
+        server, protocol_factory = server_info
+        
+        if result >= 0:
+            # New connection accepted
+            client_fd = result
+            self._create_transport_for_accepted(client_fd, protocol_factory)
+            # Rearm accept
+            self._core.submit_accept(fd)
+        # On error, don't rearm (server closed or fatal error)
+
+    def _handle_close_completion(self, fd: int, result: int):
+        """Handle a close completion."""
+        self._transports.pop(fd, None)
+        self._core.unregister_fd(fd)
+
+    def _create_transport_for_accepted(self, fd: int, protocol_factory: Callable):
+        """Create transport and protocol for an accepted connection."""
+        # Set non-blocking
+        os.set_blocking(fd, False)
+        
+        # Create protocol
+        protocol = protocol_factory()
+        
+        # Create transport
+        from uringcore.transport import UringSocketTransport
+        transport = UringSocketTransport(self, fd, protocol)
+        self._transports[fd] = transport
+        
+        # Notify protocol
+        protocol.connection_made(transport)
+        
+        # Start receiving
+        self._core.register_fd(fd, "tcp")
+        self._core.submit_recv(fd)
+
+    def _process_scheduled(self):
+        """Process scheduled callbacks that are due."""
+        now = time.monotonic()
+        
+        while self._scheduled and self._scheduled[0][0] <= now:
+            _, handle = heapq.heappop(self._scheduled)
+            if not handle._cancelled:
+                self._ready.append(handle)
+
+    def _process_ready(self):
+        """Process ready callbacks."""
+        while self._ready:
+            handle = self._ready.popleft()
+            if not handle._cancelled:
+                handle._run()
+
+    # =========================================================================
+    # Callback scheduling
+    # =========================================================================
+
+    def call_soon(self, callback, *args, context=None):
+        """Schedule a callback to be called soon."""
+        self._check_closed()
+        handle = asyncio.Handle(callback, args, self, context)
+        self._ready.append(handle)
+        return handle
+
+    def call_soon_threadsafe(self, callback, *args, context=None):
+        """Schedule a callback to be called from another thread."""
+        handle = self.call_soon(callback, *args, context=context)
+        self._core.signal()
+        return handle
+
+    def call_later(self, delay, callback, *args, context=None):
+        """Schedule a callback to be called after delay seconds."""
+        self._check_closed()
+        when = time.monotonic() + delay
+        return self.call_at(when, callback, *args, context=context)
+
+    def call_at(self, when, callback, *args, context=None):
+        """Schedule a callback to be called at a specific time."""
+        self._check_closed()
+        handle = asyncio.TimerHandle(when, callback, args, self, context)
+        heapq.heappush(self._scheduled, (when, handle))
+        return handle
+
+    def _timer_handle_cancelled(self, handle):
+        """Called when a timer handle is cancelled."""
+        # No-op: cancelled handles are filtered during processing
+        pass
+
+    # =========================================================================
+    # Time
+    # =========================================================================
+
+    def time(self):
+        """Return the current time."""
+        return time.monotonic()
+
+    # =========================================================================
+    # Future/Task creation
+    # =========================================================================
+
+    def create_future(self):
+        """Create a Future attached to this loop."""
+        return asyncio.Future(loop=self)
+
+    def create_task(self, coro, *, name=None, context=None):
+        """Create a Task from a coroutine."""
+        self._check_closed()
+        task = asyncio.Task(coro, loop=self, name=name, context=context)
+        return task
+
+    # =========================================================================
+    # Executor support
+    # =========================================================================
+
+    def run_in_executor(self, executor, func, *args):
+        """Run a function in an executor."""
+        self._check_closed()
+        
+        if executor is None:
+            executor = self._get_default_executor()
+        
+        future = executor.submit(func, *args)
+        
+        # Wrap in asyncio Future
+        loop_future = self.create_future()
+        
+        def on_done(f):
+            if self._closed:
+                return  # Silently ignore if loop is closed
+            try:
+                result = f.result()
+                self.call_soon_threadsafe(loop_future.set_result, result)
+            except Exception as e:
+                try:
+                    self.call_soon_threadsafe(loop_future.set_exception, e)
+                except RuntimeError:
+                    pass  # Loop closed, ignore
+        
+        future.add_done_callback(on_done)
+        return loop_future
+
+    def _get_default_executor(self):
+        """Get or create the default executor."""
+        if not hasattr(self, '_default_executor') or self._default_executor is None:
+            from concurrent.futures import ThreadPoolExecutor
+            self._default_executor = ThreadPoolExecutor()
+        return self._default_executor
+
+    def set_default_executor(self, executor):
+        """Set the default executor."""
+        self._default_executor = executor
+
+    # =========================================================================
+    # Server creation (Pure io_uring)
+    # =========================================================================
+
+    async def create_server(
+        self,
+        protocol_factory,
+        host=None,
+        port=None,
+        *,
+        family=socket.AF_UNSPEC,
+        flags=socket.AI_PASSIVE,
+        sock=None,
+        backlog=100,
+        ssl=None,
+        reuse_address=None,
+        reuse_port=None,
+        ssl_handshake_timeout=None,
+        ssl_shutdown_timeout=None,
+        start_serving=True,
+    ):
+        """Create a TCP server using io_uring accept."""
+        if ssl is not None:
+            raise NotImplementedError("SSL not yet supported")
+        
+        if sock is not None:
+            sockets = [sock]
+        else:
+            sockets = []
+            infos = socket.getaddrinfo(
+                host, port, family, socket.SOCK_STREAM, 0, flags
+            )
+            for af, socktype, proto, canonname, sa in infos:
+                try:
+                    sock = socket.socket(af, socktype, proto)
+                except OSError:
+                    continue
+                
+                sockets.append(sock)
+                
+                if reuse_address:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                if reuse_port:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                
+                sock.setblocking(False)
+                sock.bind(sa)
+                sock.listen(backlog)
+        
+        # Create server object
+        from uringcore.server import UringServer
+        server = UringServer(self, sockets, protocol_factory)
+        
+        # Register with io_uring
+        for s in sockets:
+            fd = s.fileno()
+            self._core.register_fd(fd, "tcp_listener")
+            self._servers[fd] = (server, protocol_factory)
+            if start_serving:
+                self._core.submit_accept(fd)
+        
+        return server
+
+    # =========================================================================
+    # Client connection (Pure io_uring)
+    # =========================================================================
+
+    async def create_connection(
+        self,
+        protocol_factory,
+        host=None,
+        port=None,
+        *,
+        ssl=None,
+        family=0,
+        proto=0,
+        flags=0,
+        sock=None,
+        local_addr=None,
+        server_hostname=None,
+        ssl_handshake_timeout=None,
+        ssl_shutdown_timeout=None,
+        happy_eyeballs_delay=None,
+        interleave=None,
+    ):
+        """Create a connection using io_uring."""
+        if ssl is not None:
+            raise NotImplementedError("SSL not yet supported")
+        
+        if sock is None:
+            infos = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+            if not infos:
+                raise OSError(f"getaddrinfo({host!r}) failed")
+            
+            af, socktype, proto, canonname, sa = infos[0]
+            sock = socket.socket(af, socktype, proto)
+            sock.setblocking(False)
+            
+            # Perform connect (non-blocking)
+            try:
+                sock.connect(sa)
+            except BlockingIOError:
+                pass  # Expected for non-blocking
+        
+        fd = sock.fileno()
+        
+        # Create protocol
+        protocol = protocol_factory()
+        
+        # Create transport
+        from uringcore.transport import UringSocketTransport
+        transport = UringSocketTransport(self, fd, protocol, sock=sock)
+        self._transports[fd] = transport
+        
+        # Register and start receiving
+        self._core.register_fd(fd, "tcp")
+        protocol.connection_made(transport)
+        self._core.submit_recv(fd)
+        
+        return transport, protocol
+
+    # =========================================================================
+    # Socket operations (Pure io_uring)
+    # =========================================================================
+
+    async def sock_recv(self, sock, nbytes):
+        """Receive data from the socket using io_uring."""
+        fd = sock.fileno()
+        fut = self.create_future()
+        
+        # Store future for completion handler
+        if fd not in self._transports:
+            self._core.register_fd(fd, "tcp")
+        
+        # Submit receive and wait for completion
+        self._core.submit_recv(fd)
+        
+        # This is a simplified implementation
+        # Real implementation would track futures per-fd
+        return await fut
+
+    async def sock_sendall(self, sock, data):
+        """Send data to the socket using io_uring."""
+        fd = sock.fileno()
+        
+        if fd not in self._transports:
+            self._core.register_fd(fd, "tcp")
+        
+        self._core.submit_send(fd, data)
+
+    async def sock_connect(self, sock, address):
+        """Connect socket to address."""
+        sock.setblocking(False)
+        try:
+            sock.connect(address)
+        except BlockingIOError:
+            pass
+        # For now, we rely on non-blocking connect completion
+
+    async def sock_accept(self, sock):
+        """Accept a connection on a socket."""
+        fd = sock.fileno()
+        self._core.submit_accept(fd)
+        # Simplified - real implementation would await the accept completion
+
+    # =========================================================================
+    # Debug and exception handling
+    # =========================================================================
+
+    def get_debug(self):
+        """Return the debug mode setting."""
+        return self._debug
+
+    def set_debug(self, enabled):
+        """Set the debug mode."""
+        self._debug = enabled
+
+    def set_exception_handler(self, handler):
+        """Set the exception handler."""
+        self._exception_handler = handler
+
+    def get_exception_handler(self):
+        """Get the exception handler."""
+        return self._exception_handler
+
+    def default_exception_handler(self, context):
+        """Default exception handler."""
+        message = context.get("message", "Unhandled exception")
+        exception = context.get("exception")
+        
+        if exception is not None:
+            import traceback
+            exc_info = (type(exception), exception, exception.__traceback__)
+            tb = "".join(traceback.format_exception(*exc_info))
+            print(f"{message}\n{tb}")
+        else:
+            print(message)
+
+    def call_exception_handler(self, context):
+        """Call the exception handler."""
+        if self._exception_handler is not None:
+            self._exception_handler(self, context)
+        else:
+            self.default_exception_handler(context)
+
+    # =========================================================================
+    # Statistics
+    # =========================================================================
+
     def get_buffer_stats(self):
         """Get buffer pool statistics."""
         return self._core.buffer_stats()

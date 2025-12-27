@@ -625,6 +625,119 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         return transport, protocol
 
     # =========================================================================
+    # Unix Sockets
+    # =========================================================================
+
+    async def create_unix_connection(
+        self,
+        protocol_factory,
+        path=None,
+        *,
+        ssl=None,
+        sock=None,
+        server_hostname=None,
+        ssl_handshake_timeout=None,
+    ):
+        """Create a Unix socket connection.
+        
+        Returns (transport, protocol) tuple.
+        """
+        self._check_closed()
+        
+        if ssl is not None:
+            raise NotImplementedError("SSL not yet supported for Unix sockets")
+        
+        if sock is None:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.setblocking(False)
+            try:
+                sock.connect(path)
+            except BlockingIOError:
+                pass  # Connection in progress - will complete async
+        
+        # Wait for connection using add_writer
+        connected = self.create_future()
+        
+        def on_connected():
+            self.remove_writer(sock.fileno())
+            # Check for connection error
+            err = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+            if err:
+                connected.set_exception(OSError(err, "Connect failed"))
+            else:
+                connected.set_result(None)
+        
+        self.add_writer(sock.fileno(), on_connected)
+        await connected
+        
+        # Create transport and protocol
+        protocol = protocol_factory()
+        
+        from uringcore.transport import UringSocketTransport
+        transport = UringSocketTransport(self, sock.fileno(), protocol, sock)
+        self._transports[sock.fileno()] = transport
+        
+        protocol.connection_made(transport)
+        
+        self._core.register_fd(sock.fileno(), "tcp")
+        self._core.submit_recv(sock.fileno())
+        
+        return transport, protocol
+
+    async def create_unix_server(
+        self,
+        protocol_factory,
+        path=None,
+        *,
+        sock=None,
+        backlog=100,
+        ssl=None,
+        ssl_handshake_timeout=None,
+        start_serving=True,
+    ):
+        """Create a Unix socket server.
+        
+        Returns a Server object.
+        """
+        self._check_closed()
+        
+        if ssl is not None:
+            raise NotImplementedError("SSL not yet supported for Unix sockets")
+        
+        import os
+        
+        if sock is not None:
+            sockets = [sock]
+        else:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setblocking(False)
+            
+            # Remove existing socket file if it exists
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                pass
+            
+            sock.bind(path)
+            sock.listen(backlog)
+            sockets = [sock]
+        
+        # Create server object
+        from uringcore.server import UringServer
+        server = UringServer(self, sockets, protocol_factory)
+        
+        # Register with io_uring
+        for s in sockets:
+            fd = s.fileno()
+            self._core.register_fd(fd, "unix_listener")
+            self._servers[fd] = (server, protocol_factory)
+            if start_serving:
+                self._core.submit_accept(fd)
+        
+        return server
+
+    # =========================================================================
     # Client connection (Pure io_uring)
     # =========================================================================
 

@@ -450,6 +450,53 @@ impl Ring {
         })
     }
 
+    /// Prepare a connect operation with timeout.
+    /// 
+    /// This uses `IOSQE_IO_LINK` to link a connect operation with a timeout.
+    /// If the connect doesn't complete within `timeout_ms`, it's cancelled.
+    pub fn prep_connect_with_timeout(
+        &mut self,
+        fd: RawFd,
+        addr: *const libc::sockaddr,
+        addr_len: libc::socklen_t,
+        timeout_ms: u64,
+        generation: u16,
+    ) -> Result<()> {
+        let connect_user_data = encode_user_data(fd, OpType::Connect, generation);
+        let timeout_user_data = encode_user_data(fd, OpType::Timeout, generation);
+
+        // Create timespec for timeout
+        let ts = types::Timespec::new()
+            .sec(timeout_ms / 1000)
+            .nsec(((timeout_ms % 1000) * 1_000_000) as u32);
+
+        // Connect operation with IO_LINK flag to link with timeout
+        let connect_entry = opcode::Connect::new(types::Fd(fd), addr, addr_len)
+            .build()
+            .user_data(connect_user_data)
+            .flags(io_uring::squeue::Flags::IO_LINK);
+
+        // Link timeout operation - cancels the linked connect if it takes too long
+        let timeout_entry = opcode::LinkTimeout::new(&ts as *const _)
+            .build()
+            .user_data(timeout_user_data);
+
+        self.with_sq(|sq| {
+            if sq.len() + 2 > sq.capacity() {
+                return Err(Error::RingOp("SQ is full for connect+timeout".into()));
+            }
+            
+            // SAFETY: Connect and LinkTimeout are safe to push
+            unsafe {
+                sq.push(&connect_entry)
+                    .map_err(|_| Error::RingOp("push connect failed".into()))?;
+                sq.push(&timeout_entry)
+                    .map_err(|_| Error::RingOp("push link_timeout failed".into()))?;
+            }
+            Ok(())
+        })
+    }
+
     /// Shutdown the ring.
     pub fn shutdown(&mut self) {
         self.is_active.store(false, Ordering::SeqCst);

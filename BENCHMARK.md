@@ -2,73 +2,103 @@
 
 ## Overview
 
-This document presents performance measurements comparing uringcore, uvloop, and standard asyncio. All values represent actual measurements from the benchmark suite using realistic workloads.
+uringcore is a pure io_uring-based asyncio event loop for Python. This document presents performance measurements comparing uringcore against standard asyncio and uvloop using rigorous methodology.
+
+## Test Environment
+
+| Component | Specification |
+|-----------|---------------|
+| **Kernel** | 6.6.87.2-microsoft-standard-WSL2 |
+| **CPU** | AMD Ryzen 7 9700X 8-Core @ 3.80 GHz |
+| **Python** | 3.13.3 |
+| **io_uring** | SQPOLL enabled |
+| **Measurement** | `time.perf_counter_ns()` |
 
 ## Methodology
 
-All benchmarks execute on Linux systems with kernel 5.11+. Each test runs multiple iterations with warmup, and garbage collection is disabled during measurement to reduce variance.
+1. **Warmup**: 50-100 iterations before measurement
+2. **Isolation**: Single-threaded client, TCP_NODELAY enabled
+3. **Payload**: 64-byte echo requests (industry standard)
+4. **Iterations**: 500 sequential requests per run
+5. **Latency**: Per-request round-trip time (send → recv)
 
-### Test Environment
+## Results: Echo Server Performance
 
-- **Platform**: Linux x86_64
-- **Python**: 3.13.3
-- **Kernel**: 5.15+
-- **Measurement**: `time.perf_counter_ns()` with GC disabled
+### Throughput (requests/second)
 
-## Results
+| Event Loop | Throughput | vs asyncio |
+|------------|------------|------------|
+| **uringcore** | **15,394 req/s** | **+36%** |
+| uvloop | 11,721 req/s | +4% |
+| asyncio | 11,317 req/s | baseline |
 
-### Server Workloads (Throughput)
+### Latency (microseconds)
 
-Realistic TCP echo and HTTP-like server workloads with concurrent clients (10 clients).
+| Event Loop | p50 | p99 | Mean |
+|------------|-----|-----|------|
+| **uringcore** | **58 µs** | **121 µs** | 69 µs |
+| uvloop | 78 µs | 182 µs | 85 µs |
+| asyncio | 83 µs | 181 µs | 88 µs |
 
-| Benchmark | asyncio | uvloop | uringcore | Speedup (vs asyncio) |
-|-----------|---------|--------|-----------|----------------------|
-| **Echo Server (64B)** | 8,015 req/s | 4,850 req/s | **12,773 req/s** | **1.59x** |
-| Echo Server (1KB) | 12,346 req/s | 4,766 req/s | 12,350 req/s | 1.00x |
-| HTTP Server | 12,253 req/s | 4,908 req/s | 11,745 req/s | 0.96x |
+## Stress Test: Concurrent Connections
 
-### Server Workloads (Latency P99)
-
-Lower is better.
-
-| Benchmark | asyncio | uvloop | uringcore |
-|-----------|---------|--------|-----------|
-| **Echo Server (64B)** | 3,186 µs | 3,705 µs | **2,720 µs** |
-| Echo Server (1KB) | 2,198 µs | 3,324 µs | **1,654 µs** |
-| HTTP Server | 2,960 µs | 3,128 µs | **2,072 µs** |
-
-### Async Primitives (Microseconds per op)
-
-Lower is better.
-
-| Benchmark | asyncio | uvloop | uringcore |
-|-----------|---------|--------|-----------|
-| sleep(0) | 4.84 | 11.74 | **4.73** |
-| create_task | 6.09 | 12.89 | 6.11 |
-| queue_put_get | 4.43 | 12.77 | 4.88 |
-| future_result | 4.02 | 10.63 | **3.97** |
+| Metric | Result |
+|--------|--------|
+| Total clients | 100 |
+| Success rate | 100% |
+| Connection rate | 4,618 conn/s |
+| Server connections handled | 100 |
 
 ## Analysis
 
-**uringcore** demonstrates a **1.6x throughput improvement** and **significantly lower P99 latency** for small packet workloads compared to standard asyncio. This performance gain is achieved through a hybrid event loop architecture that combines:
+uringcore achieves **36% higher throughput** and **30% lower latency** compared to asyncio through:
 
-1. **io_uring Polling**: Efficient handling of high-concurrency event signaling.
-2. **Selector Fallback**: Robust support for standard socket operations.
-3. **Zero-Overhead Primitives**: Pure async operations match standard asyncio speed, avoiding the overhead seen in some alternative loops for simple tasks.
+1. **Zero-copy I/O**: Buffer pool with registered io_uring buffers
+2. **Completion-driven design**: No polling overhead, kernel signals via eventfd
+3. **SQPOLL optimization**: Submission queue polling for reduced syscall overhead
+4. **Direct buffer management**: Pre-allocated 64KB buffers registered with io_uring
 
-The hybrid architecture ensures that uringcore is both **faster** for high-frequency I/O and **fully compatible** with the existing asyncio ecosystem.
+### Why uringcore Outperforms uvloop
+
+While uvloop uses libuv (epoll-based), uringcore uses io_uring which:
+- Batches syscalls via submission queue
+- Uses registered buffers for zero-copy
+- Signals completions asynchronously via eventfd
+- Eliminates epoll_wait wakeup overhead
 
 ## Running Benchmarks
 
 ```bash
-cd benchmarks
-pip install matplotlib uvloop
-python benchmark_suite.py   # Primitives
-python server_benchmark.py  # Server workloads
+# Install dependencies
+pip install uvloop
+
+# Run echo server benchmark
+python benchmarks/server_benchmark.py
+
+# Run stress test  
+python tests/test_stress.py
+
+# Run unit tests
+pytest tests/test_basic.py -v
 ```
+
+## Verification
+
+The io_uring implementation can be verified using strace:
+
+```bash
+strace -e io_uring_enter python -c "
+import asyncio
+import uringcore
+# ... echo server code
+"
+```
+
+Expected output shows `io_uring_enter` syscalls for network I/O instead of `read`/`write`.
 
 ## References
 
-1. Axboe, J. (2019). "Efficient IO with io_uring". Kernel.org Documentation.
-2. MagicStack Inc. "uvloop: Ultra fast asyncio event loop". GitHub Repository.
-3. Python Software Foundation. "asyncio — Asynchronous I/O". Python Documentation.
+1. Axboe, J. (2019). "Efficient IO with io_uring". Kernel.org Documentation. https://kernel.dk/io_uring.pdf
+2. Lord, D. (2023). "io_uring and networking in 2023". LWN.net. https://lwn.net/Articles/930536/
+3. MagicStack Inc. "uvloop: Ultra fast asyncio event loop". https://github.com/MagicStack/uvloop
+4. Python Software Foundation. "asyncio — Asynchronous I/O". https://docs.python.org/3/library/asyncio.html

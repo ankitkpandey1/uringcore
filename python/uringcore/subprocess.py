@@ -200,8 +200,11 @@ class WriteSubprocessPipeTransport(asyncio.WriteTransport):
         self._closing = False
         self._buffer = bytearray()
         
-        # Set non-blocking
-        os.set_blocking(pipe.fileno(), False)
+        # Set non-blocking - may fail if pipe is already closed
+        try:
+            os.set_blocking(pipe.fileno(), False)
+        except (OSError, ValueError):
+            self._closing = True
 
     def write(self, data):
         """Write data to the pipe."""

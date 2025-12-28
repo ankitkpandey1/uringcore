@@ -31,7 +31,7 @@
 //! asyncio.run(main())
 //! ```
 //!
-//! Copyright (c) 2024 Ankit Kumar Pandey <itsankitkp@gmail.com>
+//! Copyright (c) 2025 Ankit Kumar Pandey <itsankitkp@gmail.com>
 //! Licensed under the MIT License.
 
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]

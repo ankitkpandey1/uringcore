@@ -8,7 +8,7 @@ This benchmark measures realistic server performance with:
 - Long I/O workloads
 - High concurrency tests
 
-Copyright (c) 2024 Ankit Kumar Pandey
+Copyright (c) 2025 Ankit Kumar Pandey
 SPDX-License-Identifier: Apache-2.0
 """
 

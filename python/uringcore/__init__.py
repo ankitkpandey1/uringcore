@@ -15,7 +15,7 @@ Usage:
 
     asyncio.run(main())
 
-Copyright (c) 2024 Ankit Kumar Pandey <itsankitkp@gmail.com>
+Copyright (c) 2025 Ankit Kumar Pandey <itsankitkp@gmail.com>
 Licensed under the Apache-2.0 License.
 """
 
@@ -24,6 +24,7 @@ from uringcore.loop import UringEventLoop
 from uringcore.policy import EventLoopPolicy
 from uringcore.transport import UringSocketTransport
 from uringcore.server import UringServer
+from uringcore.metrics import Metrics, MetricsCollector, get_metrics
 
 __all__ = [
     "UringCore",
@@ -31,6 +32,10 @@ __all__ = [
     "EventLoopPolicy",
     "UringSocketTransport",
     "UringServer",
+    "Metrics",
+    "MetricsCollector",
+    "get_metrics",
     "__version__",
     "__author__",
 ]
+

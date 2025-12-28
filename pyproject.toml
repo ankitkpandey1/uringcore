@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "uringcore"
-version = "0.9.1"
+version = "1.0.0"
 description = "High-performance asyncio event loop for Python using io_uring - 36% faster than asyncio"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -13,7 +13,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: POSIX :: Linux",

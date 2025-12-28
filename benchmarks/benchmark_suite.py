@@ -6,7 +6,7 @@ performance across different implementations. Results are saved as JSON
 and optionally visualized with matplotlib.
 
 SPDX-License-Identifier: Apache-2.0
-Copyright 2024 Ankit Kumar Pandey <ankitkpandey1@gmail.com>
+Copyright 2025 Ankit Kumar Pandey <ankitkpandey1@gmail.com>
 """
 
 import asyncio

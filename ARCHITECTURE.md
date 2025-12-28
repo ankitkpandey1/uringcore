@@ -155,7 +155,9 @@ impl Ring {
 
 - **SQPOLL Mode with Fallback**: When available (`CAP_SYS_ADMIN` or kernel 5.12+), SQPOLL enables the kernel to poll the submission queue autonomously, eliminating `io_uring_enter` syscalls on the submission path. The implementation gracefully degrades to batched submission when SQPOLL is unavailable.
 
-- **eventfd Integration**: Rather than Python polling the completion queue, Rust drains CQEs and signals availability to Python via an eventfd. The Python event loop waits on this single file descriptor, maintaining compatibility with asyncio's selector-based architecture while receiving io_uring completions. Selectors are retained only as a compatibility surface; they are not used to drive correctness or I/O progress.
+- **eventfd Integration**: Rather than Python polling the completion queue, the Rust core drains CQEs and signals completion availability to Python by writing to an `eventfd` that the Python loop monitors. The Python event loop waits on this single file descriptor, maintaining compatibility with asyncio's selector-based architecture while receiving io_uring completions. Selectors are retained only as a compatibility surface; they are not authoritative for correctness — the Rust completion stream is the source of truth.
+
+- **RECV_MULTI Kernel Maturity**: Advanced features such as `RECV_MULTI` reach best performance and stability on kernel versions 5.19+ (and 6.x); earlier kernels may provide reduced functionality.
 
 - **User Data Encoding**: Each submission encodes the file descriptor, operation type, and generation ID into the 64-bit user_data field:
 
@@ -205,7 +207,9 @@ Per-file-descriptor state tracking enables sophisticated flow control and resour
 
 - **Sovereign State Machine**: Each FD operates independently with its own buffer queue and inflight count. This design isolates failures and enables fine-grained resource management.
 
-- **Generation Validation**: State operations validate the current generation ID, rejecting operations from stale (pre-fork) contexts.
+- **Generation Validation**: State operations validate the current generation ID, rejecting operations from stale (pre-fork) contexts. `generation_id` must be validated on every CQE, every buffer return, and before any Python callback; mismatches are dropped and logged.
+
+**Per-FD FIFO Invariant:** Data is delivered to Python in strict per-FD FIFO order. Partial-consumption uses `pending_offset` to preserve ordering across buffer boundaries.
 
 ---
 
@@ -387,7 +391,11 @@ For receive operations:
 4. Buffer returns to pool after Python processing
 
 For send operations:
-Zero-copy on the write path is opportunistic and restricted to provably immutable buffers; otherwise data is copied into Rust-owned memory before submission.
+Write-side zero-copy is opportunistic and restricted: only provably immutable buffers (immutable `bytes` or read-only `mmap`) may be submitted zero-copy. All other write buffers must be copied into Rust-owned pinned memory before submission.
+
+### PyCapsule Lifetime Semantics
+
+PyCapsule destructors must run on the Python loop thread (GIL). If a destructor can run on another thread, the destructor must enqueue a `return_buffer(buf_id)` call that the loop drains under GIL to safely recycle the buffer.
 
 ---
 
@@ -440,6 +448,14 @@ ring.prep_connect_with_timeout(fd, addr, addr_len, 5000, gen);
 3. **Memory Footprint**: Pre-allocated buffer pools consume memory regardless of actual usage. Applications should tune pool sizes appropriately.
 
 4. **Complexity**: The completion-driven model differs from traditional callback patterns, potentially complicating debugging.
+
+5. **Seccomp / Container Restrictions**: If required syscalls or registrations fail under seccomp or container restrictions, uringcore auto-degrades to batched `io_uring_enter` mode or falls back to an epoll-based path (configurable). Failures are surfaced with actionable diagnostics listing missing syscalls.
+
+---
+
+## Observability
+
+Expose runtime metrics (inflight buffers, queue lengths, completion latency, buffer reuse rate) and a dynamic throttle API for operators.
 
 ---
 

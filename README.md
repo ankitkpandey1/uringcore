@@ -11,7 +11,7 @@ A high-performance asyncio event loop for Linux using io_uring.
 
 uringcore provides a drop-in replacement for Python's asyncio event loop, built on the io_uring interface available in Linux kernel 5.11+ (with advanced features optimal on 5.19+). The project targets use cases where low-latency I/O and high throughput are critical requirements.
 
-The implementation leverages a completion-driven architecture rather than the traditional readiness-based model used by epoll. This design reduces syscalls on the hot path, resulting in measurable performance improvements for network-intensive applications.
+The implementation leverages a completion-driven architecture rather than the traditional readiness-based model used by epoll. This design reduces syscalls on the hot path (near-zero when SQPOLL is enabled), yielding measurable latency and CPU improvements.
 
 ## Use Cases
 
@@ -26,7 +26,7 @@ The implementation leverages a completion-driven architecture rather than the tr
 - Python 3.10+
 - Rust 1.70+
 
-**SQPOLL Mode:** Requires `CAP_SYS_ADMIN` or kernel 5.12+ with unprivileged SQPOLL. uringcore auto-detects availability and falls back to batched `io_uring_enter` when SQPOLL is unavailable. This fallback is automatic and requires no configuration.
+**SQPOLL Mode:** Requires `CAP_SYS_ADMIN` or kernel 5.12+ with unprivileged SQPOLL. SQPOLL often requires elevated privileges and may be unavailable on managed/cloud hosts; uringcore auto-detects SQPOLL capability and falls back to batched `io_uring_enter` when unsupported. This fallback is automatic and requires no configuration.
 
 ## Installation
 
@@ -120,7 +120,7 @@ Measured benchmark results against standard asyncio and uvloop. See [BENCHMARK.m
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **io_uring core I/O** | ✅ Stable | SQPOLL with auto-fallback to batched submission |
+| **Core I/O on io_uring** | ✅ Stable | Primary implementation uses io_uring; configurable fallbacks (batched `io_uring_enter` or epoll) available for restricted environments |
 | **TCP** | ✅ Stable | `create_server`, `create_connection`, `start_server` |
 | **UDP** | ✅ Stable | `create_datagram_endpoint` |
 | **Unix Sockets** | ✅ Stable | `create_unix_server`, `create_unix_connection` |

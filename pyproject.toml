@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "uringcore"
-version = "0.1.0"
-description = "Completion-driven asyncio event loop using io_uring"
+version = "0.6.0"
+description = "High-performance asyncio event loop for Python using io_uring - 36% faster than asyncio"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
@@ -13,7 +13,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: POSIX :: Linux",
@@ -21,14 +21,21 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Rust",
     "Topic :: System :: Networking",
+    "Topic :: Software Development :: Libraries :: Python Modules",
     "Framework :: AsyncIO",
+    "Typing :: Typed",
 ]
-keywords = ["asyncio", "io_uring", "event-loop", "uvloop", "networking"]
+keywords = ["asyncio", "io_uring", "event-loop", "uvloop", "networking", "high-performance", "linux", "rust"]
 
 [project.urls]
+Homepage = "https://github.com/ankitkpandey1/uringcore"
 Repository = "https://github.com/ankitkpandey1/uringcore"
+Documentation = "https://github.com/ankitkpandey1/uringcore#readme"
+Changelog = "https://github.com/ankitkpandey1/uringcore/releases"
+"Bug Tracker" = "https://github.com/ankitkpandey1/uringcore/issues"
 
 [project.optional-dependencies]
 dev = [

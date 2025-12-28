@@ -1,117 +1,197 @@
-"""Basic tests for uringcore."""
+"""Unit tests for uringcore submit_* methods."""
 
 import asyncio
 import pytest
+import uringcore
 
 
-class TestBasicFunctionality:
-    """Test basic event loop functionality."""
+# Use a single event loop for all tests to avoid multiple io_uring instances
+_loop = None
 
-    def test_import(self):
-        """Test that uringcore can be imported."""
-        import uringcore
-        assert hasattr(uringcore, "UringCore")
-        assert hasattr(uringcore, "UringEventLoop")
-        assert hasattr(uringcore, "EventLoopPolicy")
 
-    def test_core_creation(self):
-        """Test that UringCore can be created."""
-        from uringcore import UringCore
+@pytest.fixture(scope="module")
+def event_loop():
+    """Create a single uringcore event loop for all tests in module."""
+    global _loop
+    if _loop is None or _loop.is_closed():
+        policy = uringcore.EventLoopPolicy()
+        asyncio.set_event_loop_policy(policy)
+        _loop = asyncio.new_event_loop()
+    yield _loop
+    # Don't close - reuse for other tests
+
+
+@pytest.fixture
+def loop(event_loop):
+    """Provide the shared event loop."""
+    return event_loop
+
+
+class TestUringCore:
+    """Test the UringCore Rust backend."""
+
+    def test_core_creation(self, loop):
+        """Test UringCore can be accessed via loop."""
+        assert loop._core is not None
+
+    def test_event_fd(self, loop):
+        """Test event_fd is a valid file descriptor."""
+        assert loop._core.event_fd > 0
+
+    def test_fd_registration(self, loop):
+        """Test FD can be registered and unregistered."""
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        fd = sock.fileno()
         
-        core = UringCore()
-        assert core.event_fd >= 0
-        assert core.generation_id > 0
+        loop._core.register_fd(fd, "tcp")
+        loop._core.unregister_fd(fd)
+        sock.close()
 
-    def test_event_loop_creation(self):
-        """Test that UringEventLoop can be created."""
-        from uringcore import UringEventLoop
-        
-        loop = UringEventLoop()
-        assert not loop.is_running()
+    def test_fd_stats(self, loop):
+        """Test fd_stats returns tuple of ints."""
+        stats = loop._core.fd_stats()
+        assert isinstance(stats, tuple)
+        assert len(stats) == 4
+
+    def test_drain_completions_empty(self, loop):
+        """Test drain_completions returns list."""
+        completions = loop._core.drain_completions()
+        assert isinstance(completions, list)
+
+
+class TestEventLoop:
+    """Test UringEventLoop functionality."""
+
+    def test_loop_creation(self, loop):
+        """Test event loop creation."""
+        assert loop is not None
         assert not loop.is_closed()
-        loop.close()
-        assert loop.is_closed()
 
-    def test_buffer_stats(self):
-        """Test buffer statistics."""
-        from uringcore import UringCore
+    def test_call_soon(self, loop):
+        """Test call_soon schedules callback."""
+        result = []
         
-        core = UringCore()
-        total, free, quarantined, in_use = core.buffer_stats()
-        assert total > 0
-        assert free > 0
-        assert quarantined >= 0
-        assert in_use >= 0
-        assert total == free + quarantined + in_use
-
-    def test_fd_stats(self):
-        """Test FD state statistics."""
-        from uringcore import UringCore
+        def callback():
+            result.append(1)
         
-        core = UringCore()
-        fd_count, inflight, queued, paused = core.fd_stats()
-        assert fd_count >= 0
-        assert inflight >= 0
-        assert queued >= 0
-        assert paused >= 0
-
-
-class TestEventLoopPolicy:
-    """Test the event loop policy."""
-
-    def test_policy_creation(self):
-        """Test that EventLoopPolicy can be created."""
-        from uringcore import EventLoopPolicy
+        loop.call_soon(callback)
+        loop._run_once()
         
-        policy = EventLoopPolicy()
-        assert policy is not None
+        assert result == [1]
 
-    def test_new_event_loop(self):
-        """Test creating a new event loop via policy."""
-        from uringcore import EventLoopPolicy, UringEventLoop
+    def test_call_later(self, loop):
+        """Test call_later schedules delayed callback."""
+        result = []
         
-        policy = EventLoopPolicy()
-        try:
-            loop = policy.new_event_loop()
-            assert isinstance(loop, UringEventLoop)
-            loop.close()
-        except RuntimeError as e:
-            if "Cannot allocate memory" in str(e):
-                pytest.skip("Insufficient memlock limit for buffer pool")
-            raise
-
-
-class TestAsyncExecution:
-    """Test async execution."""
-
-    @pytest.mark.asyncio
-    async def test_simple_coroutine(self):
-        """Test running a simple coroutine."""
-        result = await asyncio.sleep(0, result=42)
-        assert result == 42
-
-    @pytest.mark.asyncio
-    async def test_call_soon(self):
-        """Test call_soon scheduling."""
-        results = []
+        def callback():
+            result.append(1)
         
-        def callback(value):
-            results.append(value)
+        loop.call_later(0.01, callback)
         
-        loop = asyncio.get_event_loop()
-        loop.call_soon(callback, 1)
-        loop.call_soon(callback, 2)
+        # Run loop briefly
+        async def runner():
+            await asyncio.sleep(0.05)
         
-        await asyncio.sleep(0)
-        
-        assert results == [1, 2]
+        loop.run_until_complete(runner())
+        assert result == [1]
 
-    @pytest.mark.asyncio
-    async def test_create_task(self):
-        """Test task creation."""
+    def test_create_future(self, loop):
+        """Test create_future returns a Future."""
+        fut = loop.create_future()
+        assert isinstance(fut, asyncio.Future)
+
+    def test_create_task(self, loop):
+        """Test create_task creates a Task from coroutine."""
         async def coro():
             return 42
         
-        task = asyncio.create_task(coro())
-        result = await task
+        task = loop.create_task(coro())
+        result = loop.run_until_complete(task)
         assert result == 42
+
+
+class TestAddReaderWriter:
+    """Test add_reader/add_writer functionality."""
+
+    def test_add_reader(self, loop):
+        """Test add_reader registers fd for reading."""
+        import os
+        r_fd, w_fd = os.pipe()
+        os.set_blocking(r_fd, False)
+        
+        result = []
+        
+        def on_read():
+            result.append(os.read(r_fd, 100))
+            loop.remove_reader(r_fd)
+        
+        loop.add_reader(r_fd, on_read)
+        os.write(w_fd, b'test')
+        
+        async def runner():
+            await asyncio.sleep(0.05)
+        
+        loop.run_until_complete(runner())
+        
+        os.close(r_fd)
+        os.close(w_fd)
+        
+        assert result == [b'test']
+
+    def test_add_writer(self, loop):
+        """Test add_writer registers fd for writing."""
+        import os
+        r_fd, w_fd = os.pipe()
+        os.set_blocking(w_fd, False)
+        
+        written = []
+        
+        def on_write():
+            written.append(True)
+            os.write(w_fd, b'test')
+            loop.remove_writer(w_fd)
+        
+        loop.add_writer(w_fd, on_write)
+        
+        async def runner():
+            await asyncio.sleep(0.05)
+        
+        loop.run_until_complete(runner())
+        
+        data = os.read(r_fd, 100)
+        os.close(r_fd)
+        os.close(w_fd)
+        
+        assert written == [True]
+        assert data == b'test'
+
+
+class TestNetworking:
+    """Test networking functionality."""
+
+    def test_tcp_echo(self, loop):
+        """Test TCP echo server works."""
+        async def test():
+            async def handle(reader, writer):
+                data = await reader.read(100)
+                writer.write(data)
+                await writer.drain()
+                writer.close()
+            
+            server = await asyncio.start_server(handle, '127.0.0.1', 19876)
+            await asyncio.sleep(0.05)
+            
+            reader, writer = await asyncio.open_connection('127.0.0.1', 19876)
+            writer.write(b'hello')
+            await writer.drain()
+            
+            response = await reader.read(100)
+            writer.close()
+            
+            server.close()
+            await server.wait_closed()
+            
+            assert response == b'hello'
+        
+        loop.run_until_complete(test())

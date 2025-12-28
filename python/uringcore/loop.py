@@ -10,6 +10,7 @@ import heapq
 import os
 import select
 import socket
+import subprocess
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -792,6 +793,82 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         self._core.register_fd(fd, "tcp")
         protocol.connection_made(transport)
         self._core.submit_recv(fd)
+        
+        return transport, protocol
+
+    # =========================================================================
+    # Subprocess
+    # =========================================================================
+
+    async def subprocess_exec(
+        self,
+        protocol_factory,
+        *args,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        **kwargs
+    ):
+        """Execute a subprocess.
+        
+        Returns (transport, protocol) tuple.
+        """
+        self._check_closed()
+        
+        import subprocess as sp
+        
+        proc = sp.Popen(
+            args,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            **kwargs
+        )
+        
+        protocol = protocol_factory()
+        
+        from uringcore.subprocess import SubprocessTransport
+        transport = SubprocessTransport(self, protocol, proc)
+        
+        # Notify protocol
+        protocol.connection_made(transport)
+        
+        return transport, protocol
+
+    async def subprocess_shell(
+        self,
+        protocol_factory,
+        cmd,
+        *,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        **kwargs
+    ):
+        """Execute a shell command.
+        
+        Returns (transport, protocol) tuple.
+        """
+        self._check_closed()
+        
+        import subprocess as sp
+        
+        proc = sp.Popen(
+            cmd,
+            shell=True,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            **kwargs
+        )
+        
+        protocol = protocol_factory()
+        
+        from uringcore.subprocess import SubprocessTransport
+        transport = SubprocessTransport(self, protocol, proc)
+        
+        # Notify protocol
+        protocol.connection_made(transport)
         
         return transport, protocol
 

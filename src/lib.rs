@@ -56,8 +56,8 @@ use buffer::BufferPool;
 use ring::{OpType, Ring};
 use state::{FDStateManager, SocketType};
 
-use std::collections::HashMap;
 use parking_lot::Mutex;
+use std::collections::HashMap;
 
 /// The main uringcore engine exposed to Python.
 #[pyclass]
@@ -68,7 +68,7 @@ pub struct UringCore {
     buffer_pool: Arc<BufferPool>,
     /// FD state manager
     fd_states: FDStateManager,
-    /// Inflight recv buffers: fd -> buffer_index (for completion data extraction)
+    /// Inflight recv buffers: fd -> `buffer_index` (for completion data extraction)
     inflight_recv_buffers: Mutex<HashMap<i32, u16>>,
 }
 
@@ -241,9 +241,13 @@ impl UringCore {
             } else if cqe.op_type() == OpType::Recv {
                 // Recv with inflight buffer tracking
                 // Decrement inflight count to allow recv rearm
-                let _ = self.fd_states.with_state_mut(cqe.fd(), |s| s.on_completion_empty());
-                
-                if let Some(buf_idx) = self.inflight_recv_buffers.lock().remove(&cqe.fd()) {
+                let _ = self
+                    .fd_states
+                    .with_state_mut(cqe.fd(), state::FDState::on_completion_empty);
+
+                // Extract buffer index - lock is dropped before processing
+                let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&cqe.fd());
+                if let Some(buf_idx) = buf_idx_opt {
                     if cqe.result > 0 {
                         let data = unsafe {
                             self.buffer_pool
@@ -310,7 +314,7 @@ impl UringCore {
     /// Submit a receive operation for a file descriptor.
     ///
     /// Acquires a buffer from the pool and submits a recv operation.
-    /// The completion will be delivered via drain_completions().
+    /// The completion will be delivered via `drain_completions()`.
     fn submit_recv(&mut self, fd: i32) -> PyResult<()> {
         // Check if FD should accept new submissions
         if !self.fd_states.should_submit_recv(fd) {
@@ -318,21 +322,23 @@ impl UringCore {
         }
 
         // Acquire a buffer from the pool
-        let buf_idx = self
-            .buffer_pool
-            .acquire()
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available for recv"))?;
+        let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available for recv")
+        })?;
 
         // Get buffer pointer and size
-        let buf_ptr = unsafe { self.buffer_pool.get_buffer_ptr(buf_idx) as *mut u8 };
+        let buf_ptr = unsafe { self.buffer_pool.get_buffer_ptr(buf_idx).cast::<u8>() };
+        // Buffer size is 64KB which fits in u32
+        #[allow(clippy::cast_possible_truncation)]
         let buf_len = self.buffer_pool.buffer_size() as u32;
 
         // Track inflight
         self.fd_states
-            .with_state_mut(fd, |state| state.on_submit())
+            .with_state_mut(fd, state::FDState::on_submit)
             .map_err(|e| {
                 // Release buffer on error
-                self.buffer_pool.release(buf_idx, self.buffer_pool.generation_id());
+                self.buffer_pool
+                    .release(buf_idx, self.buffer_pool.generation_id());
                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
             })?;
 
@@ -343,7 +349,8 @@ impl UringCore {
                 .prep_recv(fd, buf_ptr, buf_len, buf_idx, gen)
                 .map_err(|e| {
                     // Release buffer on error
-                    self.buffer_pool.release(buf_idx, self.buffer_pool.generation_id());
+                    self.buffer_pool
+                        .release(buf_idx, self.buffer_pool.generation_id());
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
                 })?;
         }
@@ -361,13 +368,12 @@ impl UringCore {
 
     /// Submit a send operation for a file descriptor.
     ///
-    /// The data is copied to a buffer and submitted to io_uring.
+    /// The data is copied to a buffer and submitted to `io_uring`.
     fn submit_send(&mut self, fd: i32, data: &[u8]) -> PyResult<()> {
         // Acquire a buffer from the pool
-        let buf_idx = self
-            .buffer_pool
-            .acquire()
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available"))?;
+        let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available")
+        })?;
 
         // Copy data to buffer
         let buf_slice = unsafe { self.buffer_pool.get_buffer_slice_mut(buf_idx, data.len()) };
@@ -375,18 +381,19 @@ impl UringCore {
 
         // Get buffer pointer
         let buf_ptr = buf_slice.as_ptr();
+        // Data length is limited by buffer size (64KB) which fits in u32
+        #[allow(clippy::cast_possible_truncation)]
         let len = data.len() as u32;
 
         // Submit to ring
         let gen = self.ring.generation_u16();
         unsafe {
-            self.ring
-                .prep_send(fd, buf_ptr, len, gen)
-                .map_err(|e| {
-                    // Release buffer on error
-                    self.buffer_pool.release(buf_idx, self.buffer_pool.generation_id());
-                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
-                })?;
+            self.ring.prep_send(fd, buf_ptr, len, gen).map_err(|e| {
+                // Release buffer on error
+                self.buffer_pool
+                    .release(buf_idx, self.buffer_pool.generation_id());
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+            })?;
         }
 
         // Flush to kernel
@@ -399,7 +406,7 @@ impl UringCore {
 
     /// Submit an accept operation for a listening socket.
     ///
-    /// Uses ACCEPT_MULTI for efficient connection handling.
+    /// Uses `ACCEPT_MULTI` for efficient connection handling.
     fn submit_accept(&mut self, fd: i32) -> PyResult<()> {
         let gen = self.ring.generation_u16();
         self.ring

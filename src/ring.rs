@@ -451,7 +451,7 @@ impl Ring {
     }
 
     /// Prepare a connect operation with timeout.
-    /// 
+    ///
     /// This uses `IOSQE_IO_LINK` to link a connect operation with a timeout.
     /// If the connect doesn't complete within `timeout_ms`, it's cancelled.
     pub fn prep_connect_with_timeout(
@@ -466,6 +466,8 @@ impl Ring {
         let timeout_user_data = encode_user_data(fd, OpType::Timeout, generation);
 
         // Create timespec for timeout
+        // nsec is always < 1_000_000_000 so u32 cast is safe
+        #[allow(clippy::cast_possible_truncation)]
         let ts = types::Timespec::new()
             .sec(timeout_ms / 1000)
             .nsec(((timeout_ms % 1000) * 1_000_000) as u32);
@@ -477,7 +479,7 @@ impl Ring {
             .flags(io_uring::squeue::Flags::IO_LINK);
 
         // Link timeout operation - cancels the linked connect if it takes too long
-        let timeout_entry = opcode::LinkTimeout::new(&ts as *const _)
+        let timeout_entry = opcode::LinkTimeout::new(&raw const ts)
             .build()
             .user_data(timeout_user_data);
 
@@ -485,7 +487,7 @@ impl Ring {
             if sq.len() + 2 > sq.capacity() {
                 return Err(Error::RingOp("SQ is full for connect+timeout".into()));
             }
-            
+
             // SAFETY: Connect and LinkTimeout are safe to push
             unsafe {
                 sq.push(&connect_entry)

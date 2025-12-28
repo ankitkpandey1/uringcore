@@ -246,8 +246,9 @@ impl BufferPool {
     /// The caller must ensure the index is valid, the buffer is owned,
     /// and len does not exceed the buffer size.
     #[must_use]
+    #[allow(clippy::mut_from_ref)] // Intentional: raw pointer to mutable slice for FFI
     pub unsafe fn get_buffer_slice_mut(&self, index: u16, len: usize) -> &mut [u8] {
-        let ptr = self.get_buffer_ptr(index) as *mut u8;
+        let ptr = self.get_buffer_ptr(index).cast::<u8>();
         std::slice::from_raw_parts_mut(ptr, len.min(self.buffer_size))
     }
 

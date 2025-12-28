@@ -109,12 +109,28 @@ app = Starlette(routes=[Route("/", homepage)])
 
 ## Performance
 
-Benchmark comparisons against uvloop and standard asyncio are available in [BENCHMARK.md](BENCHMARK.md).
+Verified benchmark results against standard asyncio and uvloop:
 
-Summary results:
-- **3.8x** average speedup over asyncio
-- **Near-zero** syscalls on the data path
-- **Sub-millisecond** p99 latency under load
+| Metric | uringcore | asyncio | uvloop |
+|--------|-----------|---------|--------|
+| **Throughput** | 15,394 req/s | 11,317 req/s | 11,721 req/s |
+| **p50 Latency** | 58 µs | 83 µs | 78 µs |
+| **p99 Latency** | 121 µs | 181 µs | 182 µs |
+| **vs asyncio** | **+36%** | baseline | +4% |
+
+See [BENCHMARK.md](BENCHMARK.md) for methodology and detailed analysis.
+
+## Features
+
+- **Pure io_uring** - No fallback to epoll for core I/O
+- **TCP Support** - `create_server`, `create_connection`, `start_server`
+- **UDP Support** - `create_datagram_endpoint`
+- **Unix Sockets** - `create_unix_server`, `create_unix_connection`
+- **Subprocess** - `subprocess_exec`, `subprocess_shell`
+- **Signal Handlers** - `add_signal_handler`, `remove_signal_handler`
+- **Executor Integration** - `run_in_executor` for blocking calls
+- **Reader/Writer Callbacks** - `add_reader`, `add_writer` for 3rd-party compatibility
+- **Connection Timeouts** - `IORING_OP_LINK_TIMEOUT` support
 
 ## Project Structure
 
@@ -123,16 +139,22 @@ uringcore/
 ├── src/                    # Rust core implementation
 │   ├── lib.rs              # PyO3 module entry point
 │   ├── buffer.rs           # Zero-copy buffer pool
-│   ├── ring.rs             # io_uring wrapper
+│   ├── ring.rs             # io_uring wrapper with LINK_TIMEOUT
 │   ├── state.rs            # FD state machine
 │   └── error.rs            # Error types
 ├── python/                 # Python layer
 │   └── uringcore/
 │       ├── __init__.py
 │       ├── loop.py         # UringEventLoop
-│       └── policy.py       # EventLoopPolicy
+│       ├── policy.py       # EventLoopPolicy
+│       ├── transport.py    # Socket transport
+│       ├── datagram.py     # UDP transport
+│       ├── subprocess.py   # Subprocess transport
+│       └── ssl_transport.py # SSL/TLS wrapper
 ├── tests/                  # Test suites
-│   ├── test_basic.py
+│   ├── test_basic.py       # Unit tests
+│   ├── test_stress.py      # Concurrent stress tests
+│   ├── test_asyncio_compat.py  # asyncio API tests
 │   └── e2e/
 │       ├── starlette/
 │       └── fastapi/

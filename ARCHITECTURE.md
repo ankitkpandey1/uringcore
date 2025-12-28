@@ -33,6 +33,7 @@ The uringcore project implements a completion-driven event loop for Python's asy
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Linux Kernel (5.11+)                         │
 │                      io_uring subsystem                         │
+│        (Advanced features like RECV_MULTI optimal on 5.19+)     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -154,7 +155,7 @@ impl Ring {
 
 - **SQPOLL Mode with Fallback**: When available (`CAP_SYS_ADMIN` or kernel 5.12+), SQPOLL enables the kernel to poll the submission queue autonomously, eliminating `io_uring_enter` syscalls on the submission path. The implementation gracefully degrades to batched submission when SQPOLL is unavailable.
 
-- **eventfd Integration**: Rather than polling the completion queue, an eventfd signals when completions are available. The Python event loop waits on this single file descriptor, maintaining compatibility with asyncio's selector-based architecture while receiving io_uring completions.
+- **eventfd Integration**: Rather than Python polling the completion queue, Rust drains CQEs and signals availability to Python via an eventfd. The Python event loop waits on this single file descriptor, maintaining compatibility with asyncio's selector-based architecture while receiving io_uring completions. Selectors are retained only as a compatibility surface; they are not used to drive correctness or I/O progress.
 
 - **User Data Encoding**: Each submission encodes the file descriptor, operation type, and generation ID into the 64-bit user_data field:
 
@@ -384,6 +385,9 @@ For receive operations:
 2. Completion provides buffer index and length
 3. Python receives a memoryview over the buffer (no copy)
 4. Buffer returns to pool after Python processing
+
+For send operations:
+Zero-copy on the write path is opportunistic and restricted to provably immutable buffers; otherwise data is copied into Rust-owned memory before submission.
 
 ---
 

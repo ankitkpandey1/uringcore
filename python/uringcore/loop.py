@@ -64,6 +64,9 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Reader/writer callbacks: fd -> (callback, args)
         self._readers: Dict[int, Tuple[Callable, tuple]] = {}
         self._writers: Dict[int, Tuple[Callable, tuple]] = {}
+        
+        # Signal handlers: signum -> (callback, args)
+        self._signal_handlers: Dict[int, Tuple[Callable, tuple]] = {}
 
     def _check_closed(self):
         """Check if the loop is closed and raise if so."""
@@ -955,6 +958,50 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             self._exception_handler(self, context)
         else:
             self.default_exception_handler(context)
+
+    # =========================================================================
+    # Signal Handlers
+    # =========================================================================
+
+    def add_signal_handler(self, sig, callback, *args):
+        """Add a handler for a signal.
+        
+        Args:
+            sig: Signal number (e.g., signal.SIGINT)
+            callback: Callback function
+            *args: Arguments to pass to callback
+        """
+        import signal as signal_module
+        
+        self._check_closed()
+        
+        if sig == signal_module.SIGKILL or sig == signal_module.SIGSTOP:
+            raise RuntimeError(f"Cannot register handler for signal {sig}")
+        
+        def _signal_handler(signum, frame):
+            self.call_soon_threadsafe(callback, *args)
+        
+        # Store old handler and set new one
+        self._signal_handlers[sig] = (callback, args)
+        signal_module.signal(sig, _signal_handler)
+
+    def remove_signal_handler(self, sig) -> bool:
+        """Remove a handler for a signal.
+        
+        Args:
+            sig: Signal number
+            
+        Returns:
+            True if handler was removed, False if not present
+        """
+        import signal as signal_module
+        
+        if sig not in self._signal_handlers:
+            return False
+        
+        del self._signal_handlers[sig]
+        signal_module.signal(sig, signal_module.SIG_DFL)
+        return True
 
     # =========================================================================
     # Statistics

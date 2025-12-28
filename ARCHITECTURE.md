@@ -68,15 +68,15 @@ Application                    Kernel
     │<─── completion + data ─────│  (3) CQ contains actual data
 ```
 
-**Advantage**: Zero syscalls on the hot path when using SQPOLL mode.
+**Advantage**: Near-zero syscalls on the hot path when SQPOLL is enabled; otherwise batched `io_uring_enter` submissions occur.
 
 ### Why This Matters for Performance
 
 | Operation | epoll | io_uring |
 |-----------|-------|----------|
-| Check readiness | 1 syscall | 0 |
+| Check readiness | 1 syscall | 0 (SQPOLL) / batched |
 | Data transfer | 1 syscall | 0 (pre-submitted) |
-| Context switches | 2 per I/O | 0 (kernel does async) |
+| Context switches | 2 per I/O | near-zero (kernel async) |
 | CPU cache pollution | High | Low |
 
 ### The Submission Queue (SQ) and Completion Queue (CQ)
@@ -155,7 +155,7 @@ impl Ring {
 
 - **SQPOLL Mode with Fallback**: When available (`CAP_SYS_ADMIN` or kernel 5.12+), SQPOLL enables the kernel to poll the submission queue autonomously, eliminating `io_uring_enter` syscalls on the submission path. The implementation gracefully degrades to batched submission when SQPOLL is unavailable.
 
-- **eventfd Integration**: Rather than Python polling the completion queue, the Rust core drains CQEs and signals completion availability to Python by writing to an `eventfd` that the Python loop monitors. The Python event loop waits on this single file descriptor, maintaining compatibility with asyncio's selector-based architecture while receiving io_uring completions. Selectors are retained only as a compatibility surface; they are not authoritative for correctness — the Rust completion stream is the source of truth.
+- **eventfd Integration**: Rather than Python polling the completion queue, the Rust core drains CQEs and signals completion availability to Python by writing to an `eventfd` that the Python loop monitors. **Note:** The kernel does not write to this eventfd; the Rust core is solely responsible for signaling. The Python event loop waits on this single file descriptor, maintaining compatibility with asyncio's selector-based architecture while receiving io_uring completions. Selectors are retained only as a compatibility surface; they are not authoritative for correctness — the Rust completion stream is the source of truth.
 
 - **RECV_MULTI Kernel Maturity**: Advanced features such as `RECV_MULTI` reach best performance and stability on kernel versions 5.19+ (and 6.x); earlier kernels may provide reduced functionality.
 
@@ -337,6 +337,20 @@ async def benchmark():
 | p50 latency | 83 µs | 58 µs | **-30%** |
 | p99 latency | 181 µs | 121 µs | **-33%** |
 
+### Reproducibility Metadata
+
+| Parameter | Value |
+|-----------|-------|
+| **CPU** | AMD Ryzen 7 9700X 8-Core @ 3.80 GHz |
+| **Cores used** | 1 (single-threaded benchmark) |
+| **Kernel** | 6.6.87.2-microsoft-standard-WSL2 |
+| **Python** | 3.13.3 |
+| **Payload** | 64 bytes |
+| **Iterations** | 500 requests (after 100 warmup) |
+| **Client** | Single TCP connection, sequential requests |
+| **Flags** | TCP_NODELAY enabled, GC disabled during measurement |
+| **Command** | `python benchmarks/server_benchmark.py` |
+
 ---
 
 ## Completion-Driven Virtual Readiness
@@ -432,8 +446,8 @@ ring.prep_connect_with_timeout(fd, addr, addr_len, 5000, gen);
 
 | Aspect | Traditional (epoll) | io_uring |
 |--------|---------------------|----------|
-| Readiness Check | 1 syscall | 0 syscalls |
-| Data Transfer | 1 syscall | 0 syscalls (pre-submitted) |
+| Readiness Check | 1 syscall | 0 (SQPOLL) / batched |
+| Data Transfer | 1 syscall | 0 (pre-submitted) |
 | Buffer Allocation | Per-operation | Pre-allocated pool |
 | Completion Notification | Per-FD poll | Batched via eventfd |
 
@@ -456,6 +470,20 @@ ring.prep_connect_with_timeout(fd, addr, addr_len, 5000, gen);
 ## Observability
 
 Expose runtime metrics (inflight buffers, queue lengths, completion latency, buffer reuse rate) and a dynamic throttle API for operators.
+
+---
+
+## Required CI Tests
+
+The following tests are required to validate correctness:
+
+* **Per-FD FIFO ordering**: Verify data delivery order under `RECV_MULTI` + partial reads using `pending_offset`
+* **PyCapsule lifetime**: Destructor runs → `return_buffer` queued to loop thread (not freed on random thread)
+* **Fork handling**: Parent/child ring teardown + reinit under gunicorn/uvicorn multiprocessing
+* **Seccomp/container fallback**: Simulate missing syscalls and assert graceful degradation with actionable diagnostics
+* **Backpressure**: Slow consumer test that forces credit exhaustion and verifies `pause_reading()` semantics
+* **kTLS interop** (if enabled): Verify TLS handshake/plaintext semantics and fallback when kTLS unavailable
+* **Generation ID validation**: Ensure stale CQEs from pre-fork contexts are rejected and logged
 
 ---
 

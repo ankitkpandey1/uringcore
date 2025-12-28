@@ -32,6 +32,14 @@ uringcore is a pure io_uring-based asyncio event loop for Python. This document 
 | uvloop | 11,721 req/s | +4% |
 | asyncio | 11,317 req/s | baseline |
 
+```mermaid
+xychart-beta
+    title "Throughput Comparison (req/s)"
+    x-axis ["asyncio", "uvloop", "uringcore"]
+    y-axis "Requests per second" 0 --> 18000
+    bar [11317, 11721, 15394]
+```
+
 ### Latency (microseconds)
 
 | Event Loop | p50 | p99 | Mean |
@@ -39,6 +47,22 @@ uringcore is a pure io_uring-based asyncio event loop for Python. This document 
 | **uringcore** | **58 µs** | **121 µs** | 69 µs |
 | uvloop | 78 µs | 182 µs | 85 µs |
 | asyncio | 83 µs | 181 µs | 88 µs |
+
+```mermaid
+xychart-beta
+    title "Latency Comparison (µs, lower is better)"
+    x-axis ["asyncio", "uvloop", "uringcore"]
+    y-axis "p50 Latency (µs)" 0 --> 100
+    bar [83, 78, 58]
+```
+
+```mermaid
+xychart-beta
+    title "p99 Latency Comparison (µs, lower is better)"
+    x-axis ["asyncio", "uvloop", "uringcore"]
+    y-axis "p99 Latency (µs)" 0 --> 200
+    bar [181, 182, 121]
+```
 
 ## Stress Test: Concurrent Connections
 

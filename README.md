@@ -9,26 +9,24 @@ A high-performance asyncio event loop for Linux using io_uring.
 
 ## Introduction
 
-uringcore provides a drop-in replacement for Python's asyncio event loop, built on the io_uring interface available in Linux kernel 5.11+. The project targets use cases where low-latency I/O and high throughput are critical requirements.
+uringcore provides a drop-in replacement for Python's asyncio event loop, built on the io_uring interface available in Linux kernel 5.11+ (with advanced features optimal on 5.19+). The project targets use cases where low-latency I/O and high throughput are critical requirements.
 
-The implementation leverages a completion-driven architecture rather than the traditional readiness-based model used by epoll. This design eliminates syscalls from the hot path, resulting in measurable performance improvements for network-intensive applications.
+The implementation leverages a completion-driven architecture rather than the traditional readiness-based model used by epoll. This design reduces syscalls on the hot path, resulting in measurable performance improvements for network-intensive applications.
 
 ## Use Cases
 
-- **High-frequency trading systems** requiring sub-millisecond latency
-- **Real-time data pipelines** processing millions of messages per second
+- **Real-time data pipelines** processing high message volumes
 - **API gateways** handling high concurrent connection counts
 - **WebSocket servers** with persistent connections
 - **Database connection pools** with intensive query workloads
 
 ## Requirements
 
-- Linux kernel 5.11+ (for `IORING_OP_PROVIDE_BUFFERS`)
+- Linux kernel 5.11+ (5.19+ recommended for `RECV_MULTI` optimizations)
 - Python 3.10+
 - Rust 1.70+
 
-Optional:
-- SQPOLL mode requires `CAP_SYS_ADMIN` or kernel 5.12+ with unprivileged SQPOLL
+**SQPOLL Mode:** Requires `CAP_SYS_ADMIN` or kernel 5.12+ with unprivileged SQPOLL. uringcore auto-detects availability and falls back to batched `io_uring_enter` when SQPOLL is unavailable. This fallback is automatic and requires no configuration.
 
 ## Installation
 
@@ -87,7 +85,7 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Powered by uringcore"}
+    return {"message": "Hello, World!"}
 ```
 
 ### With Starlette
@@ -109,7 +107,7 @@ app = Starlette(routes=[Route("/", homepage)])
 
 ## Performance
 
-Verified benchmark results against standard asyncio and uvloop:
+Measured benchmark results against standard asyncio and uvloop. See [BENCHMARK.md](BENCHMARK.md) for machine specs, exact commands, and methodology.
 
 | Metric | uringcore | asyncio | uvloop |
 |--------|-----------|---------|--------|
@@ -118,19 +116,32 @@ Verified benchmark results against standard asyncio and uvloop:
 | **p99 Latency** | 121 µs | 181 µs | 182 µs |
 | **vs asyncio** | **+36%** | baseline | +4% |
 
-See [BENCHMARK.md](BENCHMARK.md) for methodology and detailed analysis.
-
 ## Features
 
-- **Pure io_uring** - No fallback to epoll for core I/O
-- **TCP Support** - `create_server`, `create_connection`, `start_server`
-- **UDP Support** - `create_datagram_endpoint`
-- **Unix Sockets** - `create_unix_server`, `create_unix_connection`
-- **Subprocess** - `subprocess_exec`, `subprocess_shell`
-- **Signal Handlers** - `add_signal_handler`, `remove_signal_handler`
-- **Executor Integration** - `run_in_executor` for blocking calls
-- **Reader/Writer Callbacks** - `add_reader`, `add_writer` for 3rd-party compatibility
-- **Connection Timeouts** - `IORING_OP_LINK_TIMEOUT` support
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **io_uring core I/O** | ✅ Stable | SQPOLL with auto-fallback to batched submission |
+| **TCP** | ✅ Stable | `create_server`, `create_connection`, `start_server` |
+| **UDP** | ✅ Stable | `create_datagram_endpoint` |
+| **Unix Sockets** | ✅ Stable | `create_unix_server`, `create_unix_connection` |
+| **Signal Handlers** | ✅ Stable | `add_signal_handler`, `remove_signal_handler` |
+| **Executor** | ✅ Stable | `run_in_executor` for blocking calls |
+| **Reader/Writer** | ✅ Stable | `add_reader`, `add_writer` for compatibility |
+| **Subprocess** | 🔶 Beta | `subprocess_exec`, `subprocess_shell` |
+| **SSL/TLS** | 🔶 Beta | Memory BIO wrapper (kTLS not yet integrated) |
+| **IORING_OP_LINK_TIMEOUT** | 🔶 Beta | Connection timeout support |
+
+**Legend:** ✅ Stable (CI-tested) | 🔶 Beta (functional, limited testing)
+
+## Configuration
+
+Default buffer pool settings (tunable via environment variables):
+
+| Setting | Default | Env Var |
+|---------|---------|---------|
+| Buffer size | 64 KB | `URINGCORE_BUFFER_SIZE` |
+| Buffer count | 1024 | `URINGCORE_BUFFER_COUNT` |
+| Quarantine window | 5 ms | `URINGCORE_QUARANTINE_MS` |
 
 ## Project Structure
 
@@ -139,32 +150,24 @@ uringcore/
 ├── src/                    # Rust core implementation
 │   ├── lib.rs              # PyO3 module entry point
 │   ├── buffer.rs           # Zero-copy buffer pool
-│   ├── ring.rs             # io_uring wrapper with LINK_TIMEOUT
+│   ├── ring.rs             # io_uring wrapper
 │   ├── state.rs            # FD state machine
 │   └── error.rs            # Error types
 ├── python/                 # Python layer
 │   └── uringcore/
-│       ├── __init__.py
 │       ├── loop.py         # UringEventLoop
-│       ├── policy.py       # EventLoopPolicy
 │       ├── transport.py    # Socket transport
 │       ├── datagram.py     # UDP transport
 │       ├── subprocess.py   # Subprocess transport
 │       └── ssl_transport.py # SSL/TLS wrapper
 ├── tests/                  # Test suites
-│   ├── test_basic.py       # Unit tests
-│   ├── test_stress.py      # Concurrent stress tests
-│   ├── test_asyncio_compat.py  # asyncio API tests
-│   └── e2e/
-│       ├── starlette/
-│       └── fastapi/
 └── benchmarks/             # Performance benchmarks
 ```
 
 ## Documentation
 
-- [Architecture](ARCHITECTURE.md) - Design decisions and system overview
-- [Benchmarks](BENCHMARK.md) - Performance measurements and analysis
+- [Architecture](ARCHITECTURE.md) - Design decisions, io_uring internals, CI test matrix
+- [Benchmarks](BENCHMARK.md) - Performance measurements with reproducibility metadata
 
 ## Development
 
@@ -177,27 +180,29 @@ cargo test
 # Python tests
 source .venv/bin/activate
 pytest tests/ -v
-
-# All tests including e2e
-pytest tests/ tests/e2e/ -v
 ```
+
+CI runs tests across Python 3.10-3.13 and multiple kernel versions. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) for the test matrix.
 
 ### Code Quality
 
 ```bash
-# Rust formatting and linting
-cargo fmt
-cargo clippy --all-targets -- -D warnings
-
-# Python linting (if ruff/black installed)
-ruff check .
+cargo fmt && cargo clippy --all-targets -- -D warnings
 ```
+
+## Security
+
+- **SQPOLL** requires `CAP_SYS_ADMIN` on kernels < 5.12
+- **Seccomp**: If syscalls are blocked, uringcore falls back gracefully with diagnostic messages
+- **Containers**: Works in Docker/Podman with default seccomp profiles; restrictive profiles may require `--security-opt seccomp=unconfined`
+
+For vulnerability reports, contact: ankitkpandey1@gmail.com
 
 ## License
 
 ```
 SPDX-License-Identifier: Apache-2.0
-Copyright 2024 Ankit Kumar Pandey <ankitkpandey1@gmail.com>
+Copyright 2024-2025 Ankit Kumar Pandey <ankitkpandey1@gmail.com>
 ```
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

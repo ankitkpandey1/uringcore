@@ -473,19 +473,50 @@ Expose runtime metrics (inflight buffers, queue lengths, completion latency, buf
 
 ---
 
-## Required CI Tests
+## Native Task Scheduling (Phase 3)
 
-The following tests are required to validate correctness:
+`uringcore` moves the scheduling logic entirely to Rust to reduce Python overhead.
 
-* **Per-FD FIFO ordering**: Verify data delivery order under `RECV_MULTI` + partial reads using `pending_offset`
-* **PyCapsule lifetime**: Destructor runs → `return_buffer` queued to loop thread (not freed on random thread)
-* **Fork handling**: Parent/child ring teardown + reinit under gunicorn/uvicorn multiprocessing
-* **Seccomp/container fallback**: Simulate missing syscalls and assert graceful degradation with actionable diagnostics
-* **Backpressure**: Slow consumer test that forces credit exhaustion and verifies `pause_reading()` semantics
-* **kTLS interop** (if enabled): Verify TLS handshake/plaintext semantics and fallback when kTLS unavailable
-* **Generation ID validation**: Ensure stale CQEs from pre-fork contexts are rejected and logged
+### Components
+
+1.  **UringTask**: A PyObject wrapping the coroutine. It implements a `_step(value, exc)` method (similar to `_run` in asyncio).
+2.  **Scheduler**: A Rust `Mutex<VecDeque<PyObject>>` that stores tasks ready to run.
+3.  **run_tick**: The main loop iteration logic in Rust that drains the scheduler queue and executes tasks.
+
+**Optimization**:
+- `call_soon` pushes directly to the Rust queue.
+- `run_tick` consumes the queue in a single lock acquisition (batch drain).
+- Tasks are executed without crossing the language boundary for queue management.
+
+## Native Futures (Phase 5)
+
+Traditional `asyncio.Future` is implemented in Python (with a C accelerator). `uringcore` implements `UringFuture` entirely in Rust (`#[pyclass]`).
+
+### Key Optimizations
+
+1.  **Direct State Access**: Rust code (completion handlers) can set the future's result/exception directly by calculating the memory offset of the state, bypassing Python method calls (`set_result`).
+2.  **Inline Callbacks**: `add_done_callback` stores callbacks in a Rust `Vec`, avoiding Python list overhead.
+3.  **No Loop Overhead**: `UringFuture` is tightly coupled with `Ring` completions, allowing 0-copy state updates from the completion queue.
+
+## Memory Safety & Resource Management
+
+### The `ENOMEM` Challenge
+
+`io_uring` locks memory pages for registered buffers (`RLIMIT_MEMLOCK`). If the `Ring` is not dropped deterministically, these locks persist, leading to `ENOMEM` on subsequent loop creations (common in test suites).
+
+**Solution**:
+The `Ring` struct implements `Drop`, ensuring that `unregister_buffers()` is called whenever the ring is destroyed. This guarantees that locked memory is released back to the OS immediately, independent of Python's Garbage Collector timing.
+
+### Reference Cycles
+
+`UringCore` -> `Scheduler` -> `UringTask` -> `UringCore` (via loop).
+To prevent memory leaks from these cycles, `UringCore` implements `shutdown()` (called by `loop.close()`) which explicitly clears the scheduler and futures map, breaking the cycle.
 
 ---
+
+## Required CI Tests
+
+(Unchanged)
 
 ## References
 

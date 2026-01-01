@@ -613,8 +613,11 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             return self._task_factory(self, coro)
 
         # Use Rust-native UringTask for max performance
+        # Use Rust-native UringTask for max performance
         task = UringTask(coro, self, name, context)
-        self.call_soon(task._step, context=context)
+        # Optimization: Push task directly to scheduler (avoiding UringHandle allocation)
+        # The task checks for _run() method which delegates to _step()
+        self._core.push_task(task)
         return task
 
 

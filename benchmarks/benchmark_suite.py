@@ -233,18 +233,8 @@ def run_all_benchmarks() -> dict:
         # Full event loop benchmarks require transport layer
         
         def uringcore_loop_factory():
-            try:
-                # Try preferred
-                return asyncio.new_event_loop()
-            except RuntimeError:
-                 # We need to hack the loop creation if it uses UringCore implicitly OR
-                 # if `asyncio.new_event_loop` uses the policy which uses defaults.
-                 # The user set policy globally?
-                 # Assuming uringcore.EventLoopPolicy is set.
-                 # We can't easily pass args to new_event_loop -> policy.
-                 # We must rely on the policy or manually create UringEventLoop.
-                 from uringcore import UringEventLoop
-                 return UringEventLoop(buffer_count=buffer_count, buffer_size=buffer_size)
+             from uringcore import new_event_loop
+             return new_event_loop(buffer_count=buffer_count, buffer_size=buffer_size)
         
         results["benchmarks"]["uringcore"] = [
             asdict(r) for r in run_suite_with_loop("uringcore", uringcore_loop_factory)

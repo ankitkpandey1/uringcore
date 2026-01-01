@@ -14,9 +14,8 @@ def event_loop():
     """Create a single uringcore event loop for all tests in module."""
     global _loop
     if _loop is None or _loop.is_closed():
-        policy = uringcore.EventLoopPolicy()
-        asyncio.set_event_loop_policy(policy)
-        _loop = asyncio.new_event_loop()
+        # Use the modern factory pattern (Python 3.11+)
+        _loop = uringcore.new_event_loop(buffer_count=16, buffer_size=4096)
     yield _loop
     # Don't close - reuse for other tests
 
@@ -99,7 +98,10 @@ class TestEventLoop:
     def test_create_future(self, loop):
         """Test create_future returns a Future."""
         fut = loop.create_future()
-        assert isinstance(fut, asyncio.Future)
+        # Check Future-like interface (not strict isinstance for native implementations)
+        assert hasattr(fut, 'done')
+        assert hasattr(fut, 'result')
+        assert hasattr(fut, 'set_result')
 
     def test_create_task(self, loop):
         """Test create_task creates a Task from coroutine."""

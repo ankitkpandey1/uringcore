@@ -1,15 +1,17 @@
 """UringServer: Server implementation for io_uring event loop."""
 
 import asyncio
-from typing import List, Callable, Any, Optional
+from typing import Callable, Any
 
 
 class UringServer(asyncio.AbstractServer):
     """Server using io_uring for accepting connections."""
 
-    def __init__(self, loop: Any, sockets: list[Any], protocol_factory: Callable[[], Any]) -> None:
+    def __init__(
+        self, loop: Any, sockets: list[Any], protocol_factory: Callable[[], Any]
+    ) -> None:
         """Initialize the server.
-        
+
         Args:
             loop: The UringEventLoop instance
             sockets: List of listening sockets
@@ -38,23 +40,23 @@ class UringServer(asyncio.AbstractServer):
         """Stop serving and close the server."""
         if not self._sockets:
             return
-        
+
         self._serving = False
-        
+
         # Unregister and close sockets
         for sock in self._sockets:
             fd = sock.fileno()
             self._loop._servers.pop(fd, None)
             self._loop._core.unregister_fd(fd)
             sock.close()
-        
+
         self._sockets.clear()
 
     async def start_serving(self):
         """Start accepting connections."""
         if self._serving:
             return
-        
+
         self._serving = True
         for sock in self._sockets:
             fd = sock.fileno()
@@ -64,10 +66,10 @@ class UringServer(asyncio.AbstractServer):
         """Start accepting connections and run until close() is called."""
         if self._serving_forever_fut is not None:
             raise RuntimeError("server.serve_forever() called twice")
-        
+
         await self.start_serving()
         self._serving_forever_fut = self._loop.create_future()
-        
+
         try:
             await self._serving_forever_fut
         except asyncio.CancelledError:
@@ -86,14 +88,14 @@ class UringServer(asyncio.AbstractServer):
 
     def abort_clients(self) -> None:
         """Close all clients immediately.
-        
+
         Currently a no-op as uringcore does not track all client connections directly in the server.
         """
         pass
 
     def close_clients(self) -> None:
         """Close all clients gracefully.
-        
+
         Currently a no-op as uringcore does not track all client connections directly in the server.
         """
         pass

@@ -15,7 +15,7 @@ class TestFIFOOrdering:
 
     def test_buffer_acquisition_order(self):
         """Verify buffers are acquired in FIFO order."""
-        core = uringcore.UringCore()
+        core = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         
         # Get initial stats
         total, free_before, _, _ = core.buffer_stats()
@@ -25,11 +25,11 @@ class TestFIFOOrdering:
 
     def test_generation_id_sequential(self):
         """Verify generation IDs are sequential."""
-        core1 = uringcore.UringCore()
+        core1 = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         gen1 = core1.generation_id
         core1.shutdown()
         
-        core2 = uringcore.UringCore()
+        core2 = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         gen2 = core2.generation_id
         core2.shutdown()
         
@@ -41,7 +41,7 @@ class TestFIFOOrdering:
         """Test FD registration maintains state."""
         import socket
         
-        core = uringcore.UringCore()
+        core = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         
         # Create a socket to register
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

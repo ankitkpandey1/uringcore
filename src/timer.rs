@@ -1,3 +1,4 @@
+use parking_lot::Mutex;
 use pyo3::prelude::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -26,30 +27,41 @@ impl PartialOrd for TimerEntry {
 impl Ord for TimerEntry {
     fn cmp(&self, other: &Self) -> Ordering {
         // We want the smallest expiration to be greater (popped first)
-        other.expiration.partial_cmp(&self.expiration).unwrap_or(Ordering::Equal)
+        other
+            .expiration
+            .partial_cmp(&self.expiration)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
 pub struct TimerHeap {
-    heap: BinaryHeap<TimerEntry>,
+    heap: Mutex<BinaryHeap<TimerEntry>>,
+}
+
+impl Default for TimerHeap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TimerHeap {
+    #[must_use]
     pub fn new() -> Self {
         Self {
-            heap: BinaryHeap::new(),
+            heap: Mutex::new(BinaryHeap::new()),
         }
     }
 
-    pub fn push(&mut self, expiration: f64, handle: PyObject) {
-        self.heap.push(TimerEntry { expiration, handle });
+    pub fn push(&self, expiration: f64, handle: PyObject) {
+        self.heap.lock().push(TimerEntry { expiration, handle });
     }
 
-    pub fn pop_expired(&mut self, now: f64) -> Vec<PyObject> {
+    pub fn pop_expired(&self, now: f64) -> Vec<PyObject> {
+        let mut heap = self.heap.lock();
         let mut expired = Vec::new();
-        while let Some(top) = self.heap.peek() {
+        while let Some(top) = heap.peek() {
             if top.expiration <= now {
-                if let Some(entry) = self.heap.pop() {
+                if let Some(entry) = heap.pop() {
                     expired.push(entry.handle);
                 }
             } else {
@@ -59,11 +71,18 @@ impl TimerHeap {
         expired
     }
 
+    #[must_use]
     pub fn next_expiration(&self) -> Option<f64> {
-        self.heap.peek().map(|entry| entry.expiration)
+        self.heap.lock().peek().map(|entry| entry.expiration)
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
-        self.heap.len()
+        self.heap.lock().len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.heap.lock().is_empty()
     }
 }

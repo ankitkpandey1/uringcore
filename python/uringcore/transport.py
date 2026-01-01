@@ -5,7 +5,6 @@ that uses io_uring for all I/O operations.
 """
 
 import asyncio
-from typing import Any, Optional
 
 
 class UringSocketTransport(asyncio.Transport):
@@ -13,7 +12,7 @@ class UringSocketTransport(asyncio.Transport):
 
     def __init__(self, loop, fd: int, protocol, sock=None):
         """Initialize the transport.
-        
+
         Args:
             loop: The UringEventLoop instance
             fd: File descriptor for the socket
@@ -30,7 +29,7 @@ class UringSocketTransport(asyncio.Transport):
         self._write_buffer_size = 0
         self._paused = False
         self._high_water = 64 * 1024  # 64KB
-        self._low_water = 16 * 1024   # 16KB
+        self._low_water = 16 * 1024  # 16KB
 
     def get_extra_info(self, name, default=None):
         """Get transport extra info."""
@@ -57,7 +56,7 @@ class UringSocketTransport(asyncio.Transport):
         if self._closing:
             return
         self._closing = True
-        
+
         # Submit close via io_uring
         self._loop._core.submit_close(self._fd)
 
@@ -100,14 +99,14 @@ class UringSocketTransport(asyncio.Transport):
         """Write data to the transport."""
         if self._closing:
             return
-        
+
         if not data:
             return
-        
+
         # Submit directly via io_uring
         self._loop._core.submit_send(self._fd, bytes(data))
         self._write_buffer_size += len(data)
-        
+
         # Check high water mark
         if self._write_buffer_size >= self._high_water:
             self._protocol.pause_writing()
@@ -123,6 +122,7 @@ class UringSocketTransport(asyncio.Transport):
         if self._sock:
             try:
                 import socket
+
                 self._sock.shutdown(socket.SHUT_WR)
             except Exception:
                 pass
@@ -141,14 +141,14 @@ class UringSocketTransport(asyncio.Transport):
             return
         self._closed = True
         self._closing = True
-        
+
         # Close socket directly
         if self._sock:
             try:
                 self._sock.close()
             except Exception:
                 pass
-        
+
         # Notify protocol
         self._loop.call_soon(self._call_connection_lost, exc)
 
@@ -168,12 +168,14 @@ class UringSocketTransport(asyncio.Transport):
         try:
             self._protocol.data_received(data)
         except Exception as exc:
-            self._loop.call_exception_handler({
-                "message": "Exception in data_received callback",
-                "exception": exc,
-                "transport": self,
-                "protocol": self._protocol,
-            })
+            self._loop.call_exception_handler(
+                {
+                    "message": "Exception in data_received callback",
+                    "exception": exc,
+                    "transport": self,
+                    "protocol": self._protocol,
+                }
+            )
 
     def _eof_received(self):
         """Called when EOF is received."""
@@ -182,17 +184,20 @@ class UringSocketTransport(asyncio.Transport):
             if not keep_open:
                 self.close()
         except Exception as exc:
-            self._loop.call_exception_handler({
-                "message": "Exception in eof_received callback",
-                "exception": exc,
-                "transport": self,
-                "protocol": self._protocol,
-            })
+            self._loop.call_exception_handler(
+                {
+                    "message": "Exception in eof_received callback",
+                    "exception": exc,
+                    "transport": self,
+                    "protocol": self._protocol,
+                }
+            )
             self.close()
 
     def _error_received(self, errno: int):
         """Called when an error occurs."""
         import os
+
         exc = OSError(errno, os.strerror(-errno) if errno < 0 else f"Error {errno}")
         self._force_close(exc)
 
@@ -201,13 +206,14 @@ class UringSocketTransport(asyncio.Transport):
         if result < 0:
             # Send error
             import os
+
             exc = OSError(-result, os.strerror(-result))
             self._force_close(exc)
             return
-        
+
         # Reduce buffer size
         self._write_buffer_size = max(0, self._write_buffer_size - result)
-        
+
         # Check low water mark
         if self._write_buffer_size <= self._low_water:
             try:

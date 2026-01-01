@@ -9,13 +9,14 @@ import pytest
 import uringcore
 
 
-# Set up uringcore as the event loop policy before tests
+# Set up uringcore as the event loop
 @pytest.fixture(scope="module", autouse=True)
-def setup_policy():
-    """Set uringcore as event loop policy."""
-    asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
-    yield
-    asyncio.set_event_loop_policy(None)
+def setup_loop():
+    """Create uringcore event loop using modern factory pattern."""
+    loop = uringcore.new_event_loop(buffer_count=16, buffer_size=4096)
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
 
 
 class TestDatagramTransport:

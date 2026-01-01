@@ -2,7 +2,6 @@
 
 import asyncio
 import socket
-from typing import Any, Optional, Tuple
 
 
 class UringDatagramTransport(asyncio.DatagramTransport):
@@ -10,7 +9,7 @@ class UringDatagramTransport(asyncio.DatagramTransport):
 
     def __init__(self, loop, sock: socket.socket, protocol, address=None):
         """Initialize the transport.
-        
+
         Args:
             loop: The UringEventLoop instance
             sock: UDP socket
@@ -24,10 +23,10 @@ class UringDatagramTransport(asyncio.DatagramTransport):
         self._closing = False
         self._closed = False
         self._buffer = []
-        
+
         # Set non-blocking
         sock.setblocking(False)
-        
+
         # Start receiving via add_reader
         self._loop.add_reader(sock.fileno(), self._read_ready)
 
@@ -35,7 +34,7 @@ class UringDatagramTransport(asyncio.DatagramTransport):
         """Called when socket is readable."""
         if self._closing:
             return
-        
+
         try:
             data, addr = self._sock.recvfrom(65536)
             self._protocol.datagram_received(data, addr)
@@ -48,7 +47,7 @@ class UringDatagramTransport(asyncio.DatagramTransport):
         """Send data to the given address."""
         if self._closing:
             return
-        
+
         try:
             if addr is None:
                 addr = self._address
@@ -84,11 +83,11 @@ class UringDatagramTransport(asyncio.DatagramTransport):
         if self._closing:
             return
         self._closing = True
-        
+
         self._loop.remove_reader(self._sock.fileno())
         self._sock.close()
         self._closed = True
-        
+
         self._loop.call_soon(self._call_connection_lost, None)
 
     def _call_connection_lost(self, exc):

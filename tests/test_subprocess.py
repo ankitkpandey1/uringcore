@@ -13,10 +13,8 @@ import uringcore
 
 @pytest.fixture(scope="module")
 def event_loop():
-    """Create uringcore event loop."""
-    policy = uringcore.EventLoopPolicy()
-    asyncio.set_event_loop_policy(policy)
-    loop = asyncio.new_event_loop()
+    """Create uringcore event loop using modern factory pattern."""
+    loop = uringcore.new_event_loop(buffer_count=16, buffer_size=4096)
     yield loop
     if not loop.is_closed():
         loop.close()

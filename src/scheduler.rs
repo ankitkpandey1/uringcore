@@ -5,11 +5,18 @@ use std::collections::VecDeque;
 /// A thread-safe queue for scheduled Python tasks.
 pub struct Scheduler {
     /// Queue of (handle, context) tuples
-    /// Ideally the handle itself contains context, but for now just PyObject handle
+    /// Ideally the handle itself contains context, but for now just `PyObject` handle
     ready_queue: Mutex<VecDeque<PyObject>>,
 }
 
+impl Default for Scheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scheduler {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ready_queue: Mutex::new(VecDeque::new()),
@@ -34,11 +41,11 @@ impl Scheduler {
         }
         batch
     }
-    
+
     pub fn len(&self) -> usize {
         self.ready_queue.lock().len()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.ready_queue.lock().is_empty()
     }

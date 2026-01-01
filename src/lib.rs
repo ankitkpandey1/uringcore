@@ -42,27 +42,37 @@
 #![allow(clippy::unnecessary_wraps)]
 // PyO3 getters can't be const
 #![allow(clippy::missing_const_for_fn)]
+// PyO3 methods require owned types for Python interop
+#![allow(clippy::needless_pass_by_value)]
+// Complex types are acceptable for callback storage
+#![allow(clippy::type_complexity)]
+// Drop timing is acceptable in our async context
+#![allow(clippy::significant_drop_tightening)]
+// match is clearer than map_or_else for error handling
+#![allow(clippy::option_if_let_else)]
+// PyO3 methods need self even if unused
+#![allow(clippy::unused_self)]
 
 pub mod buffer;
 pub mod error;
-pub mod ring;
-pub mod state;
-pub mod timer;
-pub mod scheduler;
-pub mod handle;
-pub mod task;
 pub mod future;
+pub mod handle;
+pub mod ring;
+pub mod scheduler;
+pub mod state;
+pub mod task;
+pub mod timer;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::sync::Arc;
 
 use buffer::BufferPool;
+use handle::UringHandle;
 use ring::{OpType, Ring};
+use scheduler::Scheduler;
 use state::{FDStateManager, SocketType};
 use timer::TimerHeap;
-use scheduler::Scheduler;
-use handle::UringHandle;
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -70,8 +80,8 @@ use std::collections::HashMap;
 /// The main uringcore engine exposed to Python.
 #[pyclass]
 pub struct UringCore {
-    /// The `io_uring` ring
-    ring: Ring,
+    /// The `io_uring` ring (wrapped in Mutex for interior mutability)
+    ring: Mutex<Ring>,
     /// Buffer pool for zero-copy I/O
     buffer_pool: Arc<BufferPool>,
     /// FD state manager
@@ -120,7 +130,7 @@ impl UringCore {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(Self {
-            ring,
+            ring: Mutex::new(ring),
             buffer_pool,
             fd_states: FDStateManager::new(),
             inflight_recv_buffers: Mutex::new(HashMap::new()),
@@ -132,19 +142,19 @@ impl UringCore {
     /// Get the eventfd file descriptor for polling.
     #[getter]
     fn event_fd(&self) -> i32 {
-        self.ring.event_fd()
+        self.ring.lock().event_fd()
     }
 
     /// Check if SQPOLL mode is enabled.
     #[getter]
     fn sqpoll_enabled(&self) -> bool {
-        self.ring.sqpoll_enabled()
+        self.ring.lock().sqpoll_enabled()
     }
 
     /// Get the current generation ID.
     #[getter]
     fn generation_id(&self) -> u64 {
-        self.ring.generation_id()
+        self.ring.lock().generation_id()
     }
 
     /// Register a file descriptor for I/O operations.
@@ -193,12 +203,13 @@ impl UringCore {
 
     /// Check if fork has been detected.
     fn check_fork(&self) -> bool {
-        self.ring.check_fork()
+        self.ring.lock().check_fork()
     }
 
     /// Submit pending operations to the kernel.
     fn submit(&self) -> PyResult<usize> {
         self.ring
+            .lock()
             .submit()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
@@ -206,6 +217,7 @@ impl UringCore {
     /// Drain the eventfd (call after waking up).
     fn drain_eventfd(&self) -> PyResult<()> {
         self.ring
+            .lock()
             .drain_eventfd()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
@@ -214,8 +226,8 @@ impl UringCore {
     ///
     /// Returns a list of tuples: (fd, operation type, result, data).
     #[allow(clippy::cast_sign_loss)]
-    fn drain_completions(&mut self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
-        let completions = self.ring.drain_completions();
+    fn drain_completions(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+        let completions = self.ring.lock().drain_completions();
         let mut results = Vec::with_capacity(completions.len());
 
         for cqe in completions {
@@ -317,6 +329,7 @@ impl UringCore {
     /// Signal the eventfd (for testing).
     fn signal(&self) -> PyResult<()> {
         self.ring
+            .lock()
             .signal()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
@@ -329,7 +342,7 @@ impl UringCore {
     ///
     /// Acquires a buffer from the pool and submits a recv operation.
     /// The completion will be delivered via `drain_completions()`.
-    fn submit_recv(&mut self, fd: i32) -> PyResult<()> {
+    fn submit_recv(&self, fd: i32) -> PyResult<()> {
         // Check if FD should accept new submissions
         if !self.fd_states.should_submit_recv(fd) {
             return Ok(()); // Backpressure or paused
@@ -357,9 +370,10 @@ impl UringCore {
             })?;
 
         // Submit to ring
-        let gen = self.ring.generation_u16();
+        let gen = self.ring.lock().generation_u16();
         unsafe {
             self.ring
+                .lock()
                 .prep_recv(fd, buf_ptr, buf_len, buf_idx, gen)
                 .map_err(|e| {
                     // Release buffer on error
@@ -374,6 +388,7 @@ impl UringCore {
 
         // Flush to kernel
         self.ring
+            .lock()
             .submit()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -383,7 +398,7 @@ impl UringCore {
     /// Submit a send operation for a file descriptor.
     ///
     /// The data is copied to a buffer and submitted to `io_uring`.
-    fn submit_send(&mut self, fd: i32, data: &[u8]) -> PyResult<()> {
+    fn submit_send(&self, fd: i32, data: &[u8]) -> PyResult<()> {
         // Acquire a buffer from the pool
         let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available")
@@ -400,18 +415,22 @@ impl UringCore {
         let len = data.len() as u32;
 
         // Submit to ring
-        let gen = self.ring.generation_u16();
+        let gen = self.ring.lock().generation_u16();
         unsafe {
-            self.ring.prep_send(fd, buf_ptr, len, gen).map_err(|e| {
-                // Release buffer on error
-                self.buffer_pool
-                    .release(buf_idx, self.buffer_pool.generation_id());
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
-            })?;
+            self.ring
+                .lock()
+                .prep_send(fd, buf_ptr, len, gen)
+                .map_err(|e| {
+                    // Release buffer on error
+                    self.buffer_pool
+                        .release(buf_idx, self.buffer_pool.generation_id());
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+                })?;
         }
 
         // Flush to kernel
         self.ring
+            .lock()
             .submit()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -421,14 +440,16 @@ impl UringCore {
     /// Submit an accept operation for a listening socket.
     ///
     /// Uses `ACCEPT_MULTI` for efficient connection handling.
-    fn submit_accept(&mut self, fd: i32) -> PyResult<()> {
-        let gen = self.ring.generation_u16();
+    fn submit_accept(&self, fd: i32) -> PyResult<()> {
+        let gen = self.ring.lock().generation_u16();
         self.ring
+            .lock()
             .prep_accept(fd, gen)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         // Flush to kernel
         self.ring
+            .lock()
             .submit()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -436,14 +457,16 @@ impl UringCore {
     }
 
     /// Submit a close operation for a file descriptor.
-    fn submit_close(&mut self, fd: i32) -> PyResult<()> {
-        let gen = self.ring.generation_u16();
+    fn submit_close(&self, fd: i32) -> PyResult<()> {
+        let gen = self.ring.lock().generation_u16();
         self.ring
+            .lock()
             .prep_close(fd, gen)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         // Flush to kernel
         self.ring
+            .lock()
             .submit()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
@@ -451,8 +474,8 @@ impl UringCore {
     }
 
     /// Shutdown the engine.
-    fn shutdown(&mut self) {
-        self.ring.shutdown();
+    fn shutdown(&self) {
+        self.ring.lock().shutdown();
     }
 
     // =========================================================================
@@ -460,12 +483,12 @@ impl UringCore {
     // =========================================================================
 
     /// Push a timer to the heap.
-    fn push_timer(&mut self, expiration: f64, handle: PyObject) {
+    fn push_timer(&self, expiration: f64, handle: PyObject) {
         self.timers.push(expiration, handle);
     }
 
     /// Pop all expired timers.
-    fn pop_expired(&mut self, now: f64) -> Vec<PyObject> {
+    fn pop_expired(&self, now: f64) -> Vec<PyObject> {
         self.timers.pop_expired(now)
     }
 
@@ -479,19 +502,24 @@ impl UringCore {
     // =========================================================================
 
     /// Push a handle to the ready queue.
-    fn push_ready(&mut self, handle: PyObject) {
+    fn push_ready(&self, handle: PyObject) {
         self.scheduler.push(handle);
+    }
+
+    /// Get the number of ready handles.
+    fn ready_len(&self) -> usize {
+        self.scheduler.len()
     }
 
     /// Process the ready queue.
     /// Returns the number of handles processed.
-    fn run_ready(&mut self, py: Python<'_>) -> PyResult<usize> {
+    fn run_ready(&self, py: Python<'_>) -> PyResult<usize> {
         // Pop a batch to avoid infinite loops if handles schedule more handles
         // We use a reasonably high limit (e.g. 10000) or just drain a snapshot.
         // For strict fairness with I/O, we should limit.
         let handles = self.scheduler.pop_batch(10000);
         let count = handles.len();
-        
+
         for handle in handles {
             // OPTIMIZATION: Check if it's our native UringHandle
             // If so, call execute() directly (Rust-to-Rust), avoiding python method dispatch
@@ -507,24 +535,19 @@ impl UringCore {
                     // loop.py calling run_tick() will see the exception.
                     // But if we return, we abort the batch.
                     // Asyncio usually logs and continues.
-                    eprintln!("Error in task: {:?}", e);
+                    eprintln!("Error in task: {e:?}");
                     e.print(py);
                 }
             } else {
                 // Legacy asyncio.Handle or other
-                if let Err(e) = handle.bind(py).call_method0("run") {
-                     // Note: asyncio.Handle uses 'run' not '_run' publicly? 
-                     // No, internal uses _run usually. But public API is just the object.
-                     // CPython asyncio.Handle has _run.
-                     // Let's assume _run for compat with standard asyncio.
-                     // But wait, asyncio.Handle._run is implementation detail.
-                     // Actually `loop._run_once` calls `handle._run()`.
-                     eprintln!("Error in legacy task: {:?}", e);
-                     e.print(py);
+                if let Err(e) = handle.bind(py).call_method0("_run") {
+                    // asyncio.Handle._run is the execution method
+                    eprintln!("Error in legacy task: {e:?}");
+                    e.print(py);
                 }
             }
         }
-        
+
         Ok(count)
     }
 
@@ -532,12 +555,21 @@ impl UringCore {
     /// 1. Poll I/O if needed (not implemented here yet, separate `submit`).
     /// 2. Check timers.
     /// 3. Run ready queue.
-    fn run_tick(&mut self, py: Python<'_>) -> PyResult<usize> {
+    fn run_tick(&self, py: Python<'_>) -> PyResult<usize> {
         // Move expired timers to ready queue
-        // In python: expired = core.pop_expired(now) -> loop._ready.extend(expired)
-        // Here we can optimize: core.move_expired_to_ready(now)
-        // But for now let's keep it composable.
-        
+        // Move expired timers to ready queue
+
+        // Get monotonic time for timer comparison
+        let monotonic_now = py
+            .import("time")?
+            .call_method0("monotonic")?
+            .extract::<f64>()?;
+
+        let expired = self.timers.pop_expired(monotonic_now);
+        for handle in expired {
+            self.scheduler.push(handle);
+        }
+
         self.run_ready(py)
     }
 }
@@ -549,6 +581,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UringHandle>()?;
     m.add_class::<task::UringTask>()?;
     m.add_class::<future::UringFuture>()?;
+    m.add_class::<handle::UringHandle>()?;
 
     // Add version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;

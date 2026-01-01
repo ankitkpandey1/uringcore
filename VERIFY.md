@@ -7,7 +7,7 @@ This document tracks the verification process for `uringcore` to ensure it meets
 **Goal:** Prove real HTTP works, not just sockets.
 
 - [x] Baseline (asyncio): Passed (Ping: 4956 RPS)
-- [ ] uvloop: Failed to run (Environment issue)
+- [x] uvloop: Passed (5643 RPS)
 - [x] uringcore: Passed (5877 RPS)
 
 **Result:** `uringcore` outperformed `asyncio` by ~18% in this test and ran correctly.
@@ -38,7 +38,7 @@ This document tracks the verification process for `uringcore` to ensure it meets
 | Loop | Median RPS |
 |------|------------|
 | asyncio | 4239 |
-| uvloop | Failed check |
+| uvloop | 5551 |
 | uringcore | 5573 |
 
 **Result:** `uringcore` is **~31.4% faster** than `asyncio` in strict pinned mode.
@@ -50,5 +50,4 @@ This document tracks the verification process for `uringcore` to ensure it meets
 - [x] No SQPOLL (try_sqpoll=False): Passed (5407 RPS) - Verified distinct config works.
 - [x] Low buffer count (64): Failed startup (ENOMEM) - Proves config is effective and hits limits, does not stall silently.
 
----
-**Verdict:** `uringcore` is a functional, performant, and correct `io_uring`-based event loop implementation.
+

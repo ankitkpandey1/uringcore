@@ -24,14 +24,14 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     Completions are delivered via eventfd signaling.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """Initialize the event loop."""
         self._closed = False
         self._stopping = False
         self._running = False
         
         # Initialize the Rust core
-        self._core = UringCore()
+        self._core = UringCore(**kwargs)
         
         # Ready callbacks queue
         self._ready: collections.deque = collections.deque()

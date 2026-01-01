@@ -297,7 +297,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
 ---
 
-## How We Made asyncio 36% Faster
+## Comparative Performance Study
 
 ### Measurement Methodology
 

@@ -58,3 +58,6 @@ Thumbs.db
 # Local development
 .env
 .env.local
+*.log
+*.pid
+wrk/

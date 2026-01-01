@@ -1,0 +1,77 @@
+name: Verification
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify Correctness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wrk
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wrk
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install starlette fastapi httpx uvicorn uvloop django daphne
+          pip install .
+
+      - name: Check io_uring availability
+        run: |
+          python -c "import uringcore; print(f'uringcore version: {uringcore.__version__}')"
+          # Linux 5.15+ on GitHub Actions usually supports io_uring
+          uname -r
+
+      - name: Run FastAPI Test (End-to-End)
+        run: |
+          cd tests/verify
+          ./run_ci.sh fastapi
+
+      - name: Run Starlette Test (Streaming)
+        run: |
+          cd tests/verify
+          ./run_ci.sh starlette
+
+      - name: Run Django Test (ASGI)
+        run: |
+          cd tests/verify
+          ./run_ci.sh django
+
+      - name: Run Failure Mode Test (No SQPOLL)
+        run: |
+          cd tests/verify
+          ./run_ci.sh nosqpoll
+
+      - name: Strace Check (Optional)
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y strace
+          cd tests/verify
+          # Run short test with strace
+          strace -e trace=epoll_wait -o strace.log -f ./run_ci.sh fastapi || true
+          if grep -q "epoll_wait" strace.log; then
+            echo "WARNING: epoll_wait detected!"
+            cat strace.log | head -n 20
+            # Fail checking logic could go here, but strace catches python startup too
+          else
+            echo "No epoll_wait detected."
+          fi

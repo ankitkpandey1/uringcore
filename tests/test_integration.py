@@ -27,7 +27,7 @@ class TestForkSafety:
         """Verify parent and child processes have isolated io_uring instances."""
         from uringcore import UringCore
         
-        parent_core = UringCore()
+        parent_core = UringCore(buffer_count=128, buffer_size=4096)
         parent_gen = parent_core.generation_id
         parent_pid = os.getpid()
         
@@ -36,7 +36,7 @@ class TestForkSafety:
         
         if pid == 0:
             # Child process
-            child_core = UringCore()
+            child_core = UringCore(buffer_count=128, buffer_size=4096)
             child_gen = child_core.generation_id
             
             # Child should get a new instance with new generation
@@ -56,7 +56,7 @@ class TestForkSafety:
         """Verify generation ID mechanism works correctly."""
         from uringcore import UringCore
         
-        core = UringCore()
+        core = UringCore(buffer_count=128, buffer_size=4096)
         gen1 = core.generation_id
         
         # Simulate fork detection by checking if increment works
@@ -67,7 +67,7 @@ class TestForkSafety:
         """Verify buffer pool handles fork correctly."""
         from uringcore import UringCore
         
-        parent_core = UringCore()
+        parent_core = UringCore(buffer_count=128, buffer_size=4096)
         parent_stats = parent_core.buffer_stats()
         
         pid = os.fork()
@@ -75,7 +75,7 @@ class TestForkSafety:
         if pid == 0:
             # Child process
             try:
-                child_core = UringCore()
+                child_core = UringCore(buffer_count=128, buffer_size=4096)
                 child_stats = child_core.buffer_stats()
                 
                 # Child should have fresh buffer pool
@@ -101,7 +101,7 @@ class TestWorkerModel:
         def worker(worker_id: int, results_queue):
             """Worker process that creates its own UringCore."""
             try:
-                core = UringCore()
+                core = UringCore(buffer_count=128, buffer_size=4096)
                 pid = os.getpid()
                 event_fd = core.event_fd
                 gen_id = core.generation_id
@@ -152,7 +152,7 @@ class TestWorkerModel:
         results = multiprocessing.Queue()
         
         def worker(results_queue):
-            core = UringCore()
+            core = UringCore(buffer_count=128, buffer_size=4096)
             results_queue.put({
                 'pid': os.getpid(),
                 'event_fd': core.event_fd,
@@ -186,13 +186,13 @@ class TestGracefulShutdown:
         import signal
         from uringcore import UringCore
         
-        core = UringCore()
+        core = UringCore(buffer_count=128, buffer_size=4096)
         
         # Verify core can be shut down
         core.shutdown()
         
         # Should be able to create a new core after shutdown
-        core2 = UringCore()
+        core2 = UringCore(buffer_count=128, buffer_size=4096)
         assert core2.event_fd >= 0
 
     def test_context_manager_pattern(self):
@@ -200,14 +200,14 @@ class TestGracefulShutdown:
         from uringcore import UringCore
         
         # Create and explicitly clean up
-        core = UringCore()
+        core = UringCore(buffer_count=128, buffer_size=4096)
         event_fd = core.event_fd
         assert event_fd >= 0
         
         core.shutdown()
         
         # Verify cleanup worked by creating new instance
-        core2 = UringCore()
+        core2 = UringCore(buffer_count=128, buffer_size=4096)
         assert core2.event_fd >= 0
 
 

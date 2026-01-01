@@ -220,8 +220,12 @@ def run_all_benchmarks() -> dict:
     try:
         from uringcore import UringCore
         
-        # Test if UringCore works
-        core = UringCore()
+        # Check env for override or use safe defaults for testing if tight
+        buffer_count = int(os.environ.get("URINGCORE_BUFFER_COUNT", 512))
+        buffer_size = int(os.environ.get("URINGCORE_BUFFER_SIZE", 32768))
+        
+        # Initialize core (will raise helpful error if ENOMEM)
+        core = UringCore(buffer_count=buffer_count, buffer_size=buffer_size)
         core.shutdown()
         
         print("\n[uringcore] Running benchmarks...")
@@ -229,14 +233,25 @@ def run_all_benchmarks() -> dict:
         # Full event loop benchmarks require transport layer
         
         def uringcore_loop_factory():
-            return asyncio.new_event_loop()
+            try:
+                # Try preferred
+                return asyncio.new_event_loop()
+            except RuntimeError:
+                 # We need to hack the loop creation if it uses UringCore implicitly OR
+                 # if `asyncio.new_event_loop` uses the policy which uses defaults.
+                 # The user set policy globally?
+                 # Assuming uringcore.EventLoopPolicy is set.
+                 # We can't easily pass args to new_event_loop -> policy.
+                 # We must rely on the policy or manually create UringEventLoop.
+                 from uringcore import UringEventLoop
+                 return UringEventLoop(buffer_count=buffer_count, buffer_size=buffer_size)
         
         results["benchmarks"]["uringcore"] = [
             asdict(r) for r in run_suite_with_loop("uringcore", uringcore_loop_factory)
         ]
         
         # Add uringcore-specific metrics
-        core = UringCore()
+        core = UringCore(buffer_count=buffer_count, buffer_size=buffer_size)
         results["uringcore_info"] = {
             "event_fd": core.event_fd,
             "sqpoll_enabled": core.sqpoll_enabled,

@@ -47,6 +47,7 @@ pub mod buffer;
 pub mod error;
 pub mod ring;
 pub mod state;
+pub mod timer;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -55,6 +56,7 @@ use std::sync::Arc;
 use buffer::BufferPool;
 use ring::{OpType, Ring};
 use state::{FDStateManager, SocketType};
+use timer::TimerHeap;
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -70,6 +72,8 @@ pub struct UringCore {
     fd_states: FDStateManager,
     /// Inflight recv buffers: fd -> `buffer_index` (for completion data extraction)
     inflight_recv_buffers: Mutex<HashMap<i32, u16>>,
+    /// Timer heap for scheduled callbacks
+    timers: TimerHeap,
 }
 
 #[pymethods]
@@ -112,6 +116,7 @@ impl UringCore {
             buffer_pool,
             fd_states: FDStateManager::new(),
             inflight_recv_buffers: Mutex::new(HashMap::new()),
+            timers: TimerHeap::new(),
         })
     }
 
@@ -439,6 +444,25 @@ impl UringCore {
     /// Shutdown the engine.
     fn shutdown(&mut self) {
         self.ring.shutdown();
+    }
+
+    // =========================================================================
+    // Timer Methods
+    // =========================================================================
+
+    /// Push a timer to the heap.
+    fn push_timer(&mut self, expiration: f64, handle: PyObject) {
+        self.timers.push(expiration, handle);
+    }
+
+    /// Pop all expired timers.
+    fn pop_expired(&mut self, now: f64) -> Vec<PyObject> {
+        self.timers.pop_expired(now)
+    }
+
+    /// Get the expiration time of the next timer.
+    fn next_expiration(&self) -> Option<f64> {
+        self.timers.next_expiration()
     }
 }
 

@@ -561,12 +561,17 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
     def create_future(self) -> asyncio.Future[Any]:
         """Create a Future object attached to the loop."""
-        return asyncio.Future(loop=self)
+        return self._core.UringFuture(self)
 
     def create_task(self, coro, *, name=None, context=None):
         """Create a Task from a coroutine."""
         self._check_closed()
-        task = asyncio.Task(coro, loop=self, name=name, context=context)
+        if self._task_factory is not None:
+            return self._task_factory(self, coro)
+            
+        # Use Rust-native UringTask for max performance
+        task = self._core.UringTask(coro, self, name, context)
+        task._start()
         return task
 
     # =========================================================================

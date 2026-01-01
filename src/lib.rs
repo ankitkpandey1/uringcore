@@ -50,6 +50,8 @@ pub mod state;
 pub mod timer;
 pub mod scheduler;
 pub mod handle;
+pub mod task;
+pub mod future;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -545,6 +547,8 @@ impl UringCore {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UringCore>()?;
     m.add_class::<UringHandle>()?;
+    m.add_class::<task::UringTask>()?;
+    m.add_class::<future::UringFuture>()?;
 
     // Add version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;

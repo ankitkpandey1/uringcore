@@ -1,13 +1,13 @@
 """UringServer: Server implementation for io_uring event loop."""
 
 import asyncio
-from typing import List, Callable, Any
+from typing import List, Callable, Any, Optional
 
 
 class UringServer(asyncio.AbstractServer):
     """Server using io_uring for accepting connections."""
 
-    def __init__(self, loop, sockets: List[Any], protocol_factory: Callable):
+    def __init__(self, loop: Any, sockets: list[Any], protocol_factory: Callable[[], Any]) -> None:
         """Initialize the server.
         
         Args:
@@ -81,5 +81,19 @@ class UringServer(asyncio.AbstractServer):
         # Simple implementation - just return immediately after close
         pass
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<UringServer sockets={len(self._sockets)} serving={self._serving}>"
+
+    def abort_clients(self) -> None:
+        """Close all clients immediately.
+        
+        Currently a no-op as uringcore does not track all client connections directly in the server.
+        """
+        pass
+
+    def close_clients(self) -> None:
+        """Close all clients gracefully.
+        
+        Currently a no-op as uringcore does not track all client connections directly in the server.
+        """
+        pass

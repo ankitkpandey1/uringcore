@@ -13,7 +13,7 @@ Usage:
 import asyncio
 import sys
 import threading
-from typing import Optional
+from typing import Optional, Any
 
 from uringcore.loop import UringEventLoop
 
@@ -26,7 +26,7 @@ class EventLoopPolicy(asyncio.AbstractEventLoopPolicy):
     to enable uringcore as the default event loop.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the event loop policy."""
         self._local = threading.local()
 
@@ -56,13 +56,13 @@ class EventLoopPolicy(asyncio.AbstractEventLoopPolicy):
     # =========================================================================
 
     if sys.platform != "win32":
-        def get_child_watcher(self):
+        def get_child_watcher(self) -> Any:
             """Get the child watcher.
             
             Note: UringEventLoop currently uses the default child watcher.
             """
             return asyncio.get_child_watcher()
 
-        def set_child_watcher(self, watcher):
+        def set_child_watcher(self, watcher: Any) -> None:
             """Set the child watcher."""
             asyncio.set_child_watcher(watcher)

@@ -4,13 +4,14 @@ import asyncio
 import os
 import signal
 import subprocess
-from typing import Any, Optional, Tuple, Callable
+import asyncio
+from typing import Any, Optional, Tuple, Callable, Dict, List, Union, cast
 
 
 class SubprocessTransport(asyncio.SubprocessTransport):
     """Subprocess transport using add_reader for pipe I/O."""
 
-    def __init__(self, loop, protocol, proc: subprocess.Popen):
+    def __init__(self, loop: asyncio.AbstractEventLoop, protocol: asyncio.SubprocessProtocol, proc: subprocess.Popen) -> None:
         """Initialize subprocess transport.
         
         Args:
@@ -18,15 +19,16 @@ class SubprocessTransport(asyncio.SubprocessTransport):
             protocol: SubprocessProtocol instance
             proc: The Popen process object
         """
+        super().__init__()
         self._loop = loop
         self._protocol = protocol
         self._proc = proc
         self._pid = proc.pid
-        self._returncode = None
+        self._returncode: Optional[int] = None
         self._closed = False
         
         # Pipe transports: fd -> ReadPipeTransport/WritePipeTransport
-        self._pipes = {}
+        self._pipes: Dict[int, Union['ReadSubprocessPipeTransport', 'WriteSubprocessPipeTransport']] = {}
         
         # Set up stdin (write pipe)
         if proc.stdin is not None:
@@ -49,7 +51,7 @@ class SubprocessTransport(asyncio.SubprocessTransport):
         # Start monitoring process exit
         self._start_exit_waiter()
 
-    def _start_exit_waiter(self):
+    def _start_exit_waiter(self) -> None:
         """Start a thread to wait for process exit."""
         import threading
         
@@ -62,7 +64,7 @@ class SubprocessTransport(asyncio.SubprocessTransport):
         thread = threading.Thread(target=wait_for_exit, daemon=True)
         thread.start()
 
-    def _process_exited(self, returncode):
+    def _process_exited(self, returncode: int) -> None:
         """Called when the process exits."""
         self._returncode = returncode
         
@@ -89,31 +91,31 @@ class SubprocessTransport(asyncio.SubprocessTransport):
         except Exception:
             pass
 
-    def get_pid(self):
+    def get_pid(self) -> int:
         """Return the subprocess process ID."""
         return self._pid
 
-    def get_returncode(self):
+    def get_returncode(self) -> Optional[int]:
         """Return the subprocess return code or None."""
         return self._returncode
 
-    def get_pipe_transport(self, fd):
+    def get_pipe_transport(self, fd: int) -> Optional[asyncio.BaseTransport]:
         """Return the transport for the pipe with file descriptor fd."""
         return self._pipes.get(fd)
 
-    def send_signal(self, signal_num):
+    def send_signal(self, signal_num: int) -> None:
         """Send a signal to the subprocess."""
         self._proc.send_signal(signal_num)
 
-    def terminate(self):
+    def terminate(self) -> None:
         """Terminate the subprocess."""
         self._proc.terminate()
 
-    def kill(self):
+    def kill(self) -> None:
         """Kill the subprocess."""
         self._proc.kill()
 
-    def close(self):
+    def close(self) -> None:
         """Close the transport."""
         if self._closed:
             return
@@ -125,11 +127,11 @@ class SubprocessTransport(asyncio.SubprocessTransport):
         if self._returncode is None:
             self.terminate()
 
-    def is_closing(self):
+    def is_closing(self) -> bool:
         """Return True if the transport is closing."""
         return self._closed
 
-    def get_extra_info(self, name, default=None):
+    def get_extra_info(self, name: str, default: Any = None) -> Any:
         """Get extra info."""
         if name == "subprocess":
             return self._proc
@@ -139,7 +141,8 @@ class SubprocessTransport(asyncio.SubprocessTransport):
 class ReadSubprocessPipeTransport(asyncio.ReadTransport):
     """Read transport for subprocess stdout/stderr."""
 
-    def __init__(self, loop, pipe, protocol, fd):
+    def __init__(self, loop: asyncio.AbstractEventLoop, pipe: Any, protocol: asyncio.SubprocessProtocol, fd: int) -> None:
+        super().__init__()
         self._loop = loop
         self._pipe = pipe
         self._protocol = protocol
@@ -152,7 +155,7 @@ class ReadSubprocessPipeTransport(asyncio.ReadTransport):
         # Start reading
         self._loop.add_reader(pipe.fileno(), self._read_ready)
 
-    def _read_ready(self):
+    def _read_ready(self) -> None:
         """Called when pipe is readable."""
         try:
             data = os.read(self._pipe.fileno(), 65536)

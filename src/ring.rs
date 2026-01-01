@@ -263,7 +263,18 @@ impl Ring {
             self.ring
                 .submitter()
                 .register_buffers(&iovecs)
-                .map_err(|e| Error::RingOp(format!("register_buffers failed: {e}")))?;
+                .map_err(|e| {
+                    if e.raw_os_error() == Some(12) {
+                        Error::RingOp(
+                            "register_buffers failed: Cannot allocate memory (ENOMEM). \
+                             This usually means the RLIMIT_MEMLOCK is too low. \
+                             Try increasing it with 'ulimit -l 65536' or editing /etc/security/limits.conf. \
+                             Original error: 12".to_string()
+                        )
+                    } else {
+                        Error::RingOp(format!("register_buffers failed: {e}"))
+                    }
+                })?;
         }
 
         self.buffer_pool = Some(pool);
@@ -512,6 +523,15 @@ impl Ring {
     /// Shutdown the ring.
     pub fn shutdown(&mut self) {
         self.is_active.store(false, Ordering::SeqCst);
+    }
+}
+
+impl Drop for Ring {
+    fn drop(&mut self) {
+        // Explicitly unregister buffers to release locked memory immediately
+        if self.buffer_pool.is_some() {
+            let _ = self.ring.submitter().unregister_buffers();
+        }
     }
 }
 

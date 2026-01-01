@@ -99,6 +99,21 @@ impl UringHandle {
 }
 
 impl UringHandle {
+    pub(crate) fn new_native(
+        callback: PyObject,
+        args: Py<PyTuple>,
+        loop_: PyObject,
+        context: Option<PyObject>,
+    ) -> Self {
+        Self {
+            callback,
+            args,
+            loop_,
+            context,
+            cancelled: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
     /// Fast path execution called by Scheduler
     pub fn execute(&self, py: Python<'_>) -> PyResult<()> {
         if self.cancelled.load(Ordering::Relaxed) {

@@ -254,6 +254,10 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     # Internal: Running one iteration
     # =========================================================================
 
+    # =========================================================================
+    # Internal: Running one iteration
+    # =========================================================================
+
     def _run_once(self):
         """Run one iteration of the event loop."""
         timeout = self._calculate_timeout()
@@ -264,24 +268,23 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Process events
         for fd, event_mask in events:
             if fd == self._core.event_fd:
-                # io_uring completion signal
+                # io_uring completion signal / wakeup
                 self._core.drain_eventfd()
                 self._process_completions()
             else:
                 # Reader/writer callback
-                # Traditional FD callbacks still managed in Python dicts for now
-                # We should push them to Rust ready queue to execute
                 if event_mask & select.EPOLLIN and fd in self._readers:
                     callback, args = self._readers[fd]
                     handle = asyncio.Handle(callback, args, self)
-                    self._core.push_ready(handle)
+                    self._core.push_task(handle)
                 if event_mask & select.EPOLLOUT and fd in self._writers:
                     callback, args = self._writers[fd]
                     handle = asyncio.Handle(callback, args, self)
-                    self._core.push_ready(handle)
+                    self._core.push_task(handle)
 
         # Run one tick of Rust scheduler (timers + ready queue)
-        self._core.run_tick()
+        # Timeout handled by epoll above, so we pass 0.0 (non-blocking)
+        self._core.run_tick(0.0)
 
     def _calculate_timeout(self) -> float:
         """Calculate the timeout for the next poll."""
@@ -297,7 +300,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             timeout = max(0.0, next_time - now)
             return min(timeout, 0.01)  # Cap at 10ms for responsiveness
 
-        return 0.01  # 10ms default for fast io_uring responsiveness
+        return 0.01
 
     def _process_completions(self):
         """Process completions from the io_uring ring."""
@@ -424,21 +427,16 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
         # Start receiving
         self._core.register_fd(fd, "tcp")
-        self._core.submit_recv(fd)
+        # transport.resume_reading() logic includes rearm_recv
+        transport.resume_reading()
+        # Initial submission is done via resume_reading -> _rearm_recv
 
-    def _process_scheduled(self):
-        """Process scheduled callbacks that are due."""
-        now = time.monotonic()
-
-        expired = self._core.pop_expired(now)
-        for handle in expired:
-            if not handle._cancelled:
-                self._ready.append(handle)
+    # Removed _process_scheduled as it is handled by Rust run_tick
 
     def _process_ready(self):
         """Process ready callbacks."""
-        # Process ready callbacks (managed by Rust)
-        self._core.run_ready()
+        # Now handled by run_tick
+        pass
 
     # =========================================================================
     # Callback scheduling
@@ -452,7 +450,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
         # Use Rust-native UringHandle for optimization
         handle = UringHandle(callback, args, self, context)
-        self._core.push_ready(handle)
+        self._core.push_task(handle)
         return handle
 
     def call_soon_threadsafe(self, callback, *args, context=None):
@@ -462,7 +460,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             self._check_callback(callback, "call_soon_threadsafe")
 
         handle = UringHandle(callback, args, self, context)
-        self._core.push_ready(handle)
+        self._core.push_task(handle)
         self._write_to_self()
         return handle
 
@@ -616,7 +614,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
         # Use Rust-native UringTask for max performance
         task = UringTask(coro, self, name, context)
-        task._start()
+        self.call_soon(task._step, context=context)
         return task
 
 
@@ -1141,7 +1139,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Register and start receiving
         self._core.register_fd(fd, "tcp")
         protocol.connection_made(transport)
-        self._core.submit_recv(fd)
+        transport.resume_reading()
 
         return transport, protocol
 

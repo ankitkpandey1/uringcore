@@ -181,10 +181,11 @@ class TestNetworking:
                 await writer.drain()
                 writer.close()
             
-            server = await asyncio.start_server(handle, '127.0.0.1', 19876)
+            server = await asyncio.start_server(handle, '127.0.0.1', 0)
+            port = server.sockets[0].getsockname()[1]
             await asyncio.sleep(0.05)
             
-            reader, writer = await asyncio.open_connection('127.0.0.1', 19876)
+            reader, writer = await asyncio.open_connection('127.0.0.1', port)
             writer.write(b'hello')
             await writer.drain()
             

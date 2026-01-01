@@ -11,6 +11,8 @@ pub struct UringTask {
     context: Option<PyObject>,
     future: PyObject,
     wakeup: Arc<Mutex<Option<PyObject>>>,
+    #[pyo3(get, set)]
+    _log_destroy_pending: bool,
 }
 
 use crate::future::{FutureState, UringFuture};
@@ -36,27 +38,31 @@ impl UringTask {
             context,
             future,
             wakeup: Arc::new(Mutex::new(None)),
+            _log_destroy_pending: true,
         })
     }
 
     /// Public API to start the task
     #[allow(clippy::needless_pass_by_value)]
     fn _start(slf: Py<Self>, py: Python<'_>) -> PyResult<()> {
-        let loop_ = slf.borrow(py).loop_.clone_ref(py);
+        let refs = slf.borrow(py);
+        let loop_ = refs.loop_.clone_ref(py);
+
+        let kwargs = if let Some(ctx) = refs.context.as_ref() {
+            let d = pyo3::types::PyDict::new(py);
+            d.set_item("context", ctx)?;
+            Some(d)
+        } else {
+            None
+        };
+
         let step_cb = slf.getattr(py, "_step")?;
-        loop_.call_method1(py, "call_soon", (step_cb,))?;
+        loop_.call_method(py, "call_soon", (step_cb,), kwargs.as_ref())?;
         Ok(())
     }
 
-    /// The core step method.
-    #[pyo3(signature = (value=None, exc=None))]
-    #[allow(clippy::needless_pass_by_value)]
-    fn _step(
-        slf: Py<Self>,
-        py: Python<'_>,
-        value: Option<PyObject>,
-        exc: Option<PyObject>,
-    ) -> PyResult<()> {
+    /// The core step method (Native Rust version).
+    pub fn run_step(&self, py: Python<'_>, slf: Py<Self>) -> PyResult<()> {
         let (coro, loop_, future) = {
             let refs = slf.borrow(py);
             (
@@ -70,12 +76,21 @@ impl UringTask {
             return Ok(());
         }
 
-        let result = if let Some(e) = exc {
-            coro.call_method1(py, "throw", (e,))
-        } else {
-            let arg = value.unwrap_or_else(|| py.None());
+        // Setup asyncio current_task context
+        let asyncio_tasks = py.import("asyncio.tasks")?;
+        // _enter_task(loop, task)
+        asyncio_tasks.call_method1("_enter_task", (loop_.clone_ref(py), slf.clone_ref(py)))?;
+
+        // Note: run_step currently assumes no args (e.g. from ready queue).
+        // If we need to pass args, we need to store them on the task or infer from future.
+        // For standard task execution (send(None)), this is sufficient.
+        let result = {
+            let arg = py.None();
             coro.call_method1(py, "send", (arg,))
         };
+
+        // Restore context
+        asyncio_tasks.call_method1("_leave_task", (loop_.clone_ref(py), slf.clone_ref(py)))?;
 
         // Helper to get or create wakeup safely
         let get_wakeup = || -> PyResult<PyObject> {
@@ -115,18 +130,125 @@ impl UringTask {
                             // Finished in between
                             drop(state_guard);
                             let args = (wakeup, yielded);
-                            loop_.call_method1(py, "call_soon", args)?;
+                            // If finished, we just call wakeup.
+                            // wakeup -> _step -> run_step. recursion?
+                            // Standard asyncio uses call_soon.
+                            // Here we use call_soon to be safe and consistent with logic below
+
+                            let refs = slf.borrow(py);
+                            let kwargs = if let Some(ctx) = refs.context.as_ref() {
+                                let d = pyo3::types::PyDict::new(py);
+                                d.set_item("context", ctx)?;
+                                Some(d)
+                            } else {
+                                None
+                            };
+
+                            loop_.call_method(py, "call_soon", args, kwargs.as_ref())?;
                         }
                     } else {
                         drop(state_guard);
                         let wakeup = get_wakeup()?;
                         let args = (wakeup, yielded);
-                        loop_.call_method1(py, "call_soon", args)?;
+
+                        let refs = slf.borrow(py);
+                        let kwargs = if let Some(ctx) = refs.context.as_ref() {
+                            let d = pyo3::types::PyDict::new_bound(py);
+                            d.set_item("context", ctx)?;
+                            Some(d)
+                        } else {
+                            None
+                        };
+
+                        loop_.call_method(py, "call_soon", args, kwargs.as_ref())?;
                     }
                 } else if yielded.is_none(py) {
-                    let step_cb = slf.getattr(py, "_step")?;
-                    loop_.call_method1(py, "call_soon", (step_cb,))?;
+                    // Task yielded None (e.g. sleep(0)). Re-schedule immediately.
+                    // Instead of call_soon, we push directly to core.
+                    let core = loop_.getattr(py, "_core")?;
+                    core.call_method1(py, "push_task", (slf.clone_ref(py),))?;
                 } else {
+                    let wakeup = get_wakeup()?;
+                    yielded.call_method1(py, "add_done_callback", (wakeup,))?;
+                }
+            }
+            Err(e) => {
+                if e.is_instance_of::<PyStopIteration>(py) {
+                    let value = e.value(py);
+                    let ret_val = value
+                        .getattr("value")
+                        .map_or_else(|_| py.None(), std::convert::Into::into);
+                    future.call_method1(py, "set_result", (ret_val,))?;
+                } else {
+                    future.call_method1(py, "set_exception", (e,))?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The core step method (Python exposed).
+    #[pyo3(signature = (value=None, exc=None))]
+    #[allow(clippy::needless_pass_by_value)]
+    fn _step(
+        slf: Py<Self>,
+        py: Python<'_>,
+        value: Option<PyObject>,
+        exc: Option<PyObject>,
+    ) -> PyResult<()> {
+        let (coro, loop_, future) = {
+            let refs = slf.borrow(py);
+            (
+                refs.coro.clone_ref(py),
+                refs.loop_.clone_ref(py),
+                refs.future.clone_ref(py),
+            )
+        };
+
+        if future.call_method0(py, "done")?.is_truthy(py)? {
+            return Ok(());
+        }
+
+        // Setup asyncio current_task context
+        let asyncio_tasks = py.import("asyncio.tasks")?;
+        // _enter_task(loop, task)
+        asyncio_tasks.call_method1("_enter_task", (loop_.clone_ref(py), slf.clone_ref(py)))?;
+
+        let result = if let Some(e) = exc {
+            coro.call_method1(py, "throw", (e,))
+        } else {
+            let arg = value.unwrap_or_else(|| py.None());
+            coro.call_method1(py, "send", (arg,))
+        };
+
+        // Restore context
+        asyncio_tasks.call_method1("_leave_task", (loop_.clone_ref(py), slf.clone_ref(py)))?;
+
+        // Helper to get or create wakeup safely
+        let get_wakeup = || -> PyResult<PyObject> {
+            {
+                let refs = slf.borrow(py);
+                let w = refs.wakeup.lock();
+                if let Some(ref obj) = *w {
+                    return Ok(obj.clone_ref(py));
+                }
+            } // Lock released
+
+            let obj = slf.getattr(py, "_wakeup")?;
+            let refs = slf.borrow(py);
+            let mut w = refs.wakeup.lock();
+            *w = Some(obj.clone_ref(py));
+            Ok(obj)
+        };
+
+        match result {
+            Ok(yielded) => {
+                if yielded.is_none(py) {
+                    // Optimization for yield None in legacy _step too
+                    let core = loop_.getattr(py, "_core")?;
+                    core.call_method1(py, "push_task", (slf.clone_ref(py),))?;
+                } else {
+                    // Logic for other futures remains same (use add_done_callback)
                     let wakeup = get_wakeup()?;
                     yielded.call_method1(py, "add_done_callback", (wakeup,))?;
                 }
@@ -172,30 +294,12 @@ impl UringTask {
     // =========================================================================
 
     fn cancel(&self, py: Python<'_>) -> PyResult<PyObject> {
-        // We should cancel the future AND stop the task stepping?
-        // Task cancellation: Future.cancel(), then throw CancelledError into coro?
-        // asyncio.Task.cancel logic:
-        // 1. future.cancel() -> returns True/False
-        // 2. If task not done, schedule a throw(CancelledError) into coro
-
-        // Simplified: Just delegate to future for now.
-        // But if we don't throw into coro, the coro keeps running?
-        // We need to implement proper Task cancellation.
-        // Step 1: Check if already done.
         if self.future.call_method0(py, "done")?.is_truthy(py)? {
             return Ok(pyo3::types::PyBool::new(py, false)
                 .to_owned()
                 .into_any()
                 .unbind());
         }
-
-        // Step 2: Cancel future? No, Task is "done" when coro returns.
-        // We set a flag or just throw CancelledError next step.
-        // But benchmarks usually don't cancel.
-        // Let's implement full delegation for "Future-like" behavior benchmarks need.
-        // gather() calls cancel() on tasks if one fails.
-        // So we must support it.
-
         self.future.call_method0(py, "cancel")
     }
 
@@ -205,6 +309,10 @@ impl UringTask {
 
     fn result(&self, py: Python<'_>) -> PyResult<PyObject> {
         self.future.call_method0(py, "result")
+    }
+
+    fn cancelled(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.future.call_method0(py, "cancelled")
     }
 
     fn exception(&self, py: Python<'_>) -> PyResult<PyObject> {

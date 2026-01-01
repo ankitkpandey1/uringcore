@@ -29,7 +29,7 @@ from typing import Optional, Any
 from uringcore.loop import UringEventLoop
 
 
-class EventLoopPolicy:
+class EventLoopPolicy(asyncio.AbstractEventLoopPolicy):
     """Event loop policy for uringcore.
 
     This policy creates UringEventLoop instances for asyncio operations.

@@ -296,7 +296,17 @@ impl Ring {
     /// # Errors
     ///
     /// Returns an error if submission fails.
-    pub fn submit(&self) -> Result<usize> {
+    /// Submit pending operations to the kernel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if submission fails.
+    pub fn submit(&mut self) -> Result<usize> {
+        // Optimization: Don't submit if SQ is empty
+        if self.ring.submission().len() == 0 {
+            return Ok(0);
+        }
+
         // Always call submit to ensure operations are flushed to kernel
         // Even with SQPOLL, we need io_uring_enter when the kernel thread is idle
         self.ring

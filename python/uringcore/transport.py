@@ -78,7 +78,41 @@ class UringSocketTransport(asyncio.Transport):
         self._paused = False
         self._loop._core.resume_reading(self._fd)
         # Rearm receive
-        self._loop._core.submit_recv(self._fd)
+        self._rearm_recv()
+
+    def _rearm_recv(self):
+        """Submit a receive operation."""
+        if self._closing or self._paused:
+            return
+            
+        try:
+            fut = self._loop.create_future()
+            fut.add_done_callback(self._on_recv_complete)
+            self._loop._core.submit_recv(self._fd, fut)
+        except Exception as exc:
+            self._error_received(exc)
+
+    def _on_recv_complete(self, fut):
+        """Handle receive completion."""
+        if self._closing:
+            return
+            
+        try:
+            exc = fut.exception()
+            if exc:
+                self._error_received_exc(exc)
+                return
+
+            data = fut.result()
+            if data:
+                self._data_received(data)
+                # Auto-rearm if not paused/closed
+                if not self._paused and not self._closing:
+                    self._rearm_recv()
+            else:
+                self._eof_received()
+        except Exception as exc:
+            self._error_received_exc(exc)
 
     def set_write_buffer_limits(self, high=None, low=None):
         """Set the high- and low-water limits for write flow control."""
@@ -103,13 +137,34 @@ class UringSocketTransport(asyncio.Transport):
         if not data:
             return
 
-        # Submit directly via io_uring
-        self._loop._core.submit_send(self._fd, bytes(data))
-        self._write_buffer_size += len(data)
+        # Submit directly via io_uring with future
+        try:
+            fut = self._loop.create_future()
+            fut.add_done_callback(self._on_write_complete)
+            self._loop._core.submit_send(self._fd, bytes(data), fut)
+            self._write_buffer_size += len(data)
 
-        # Check high water mark
-        if self._write_buffer_size >= self._high_water:
-            self._protocol.pause_writing()
+            # Check high water mark
+            if self._write_buffer_size >= self._high_water:
+                self._protocol.pause_writing()
+        except Exception as exc:
+            self._error_received_exc(exc)
+
+    def _on_write_complete(self, fut):
+        """Handle write completion."""
+        if self._closing:
+            return
+
+        try:
+            exc = fut.exception()
+            if exc:
+                self._error_received_exc(exc)
+                return
+            
+            result = fut.result()
+            self._send_completed(result)
+        except Exception as exc:
+             self._error_received_exc(exc)
 
     def writelines(self, list_of_data):
         """Write a list of data to the transport."""
@@ -194,21 +249,26 @@ class UringSocketTransport(asyncio.Transport):
             )
             self.close()
 
-    def _error_received(self, errno: int):
-        """Called when an error occurs."""
-        import os
-
-        exc = OSError(errno, os.strerror(-errno) if errno < 0 else f"Error {errno}")
+    def _error_received(self, error):
+        """Called when an error occurs (int or exception)."""
+        if isinstance(error, int):
+            import os
+            exc = OSError(error, os.strerror(abs(error)))
+        else:
+            exc = error
+        self._force_close(exc)
+        
+    def _error_received_exc(self, exc):
+        """Helper for exception objects."""
         self._force_close(exc)
 
     def _send_completed(self, result: int):
         """Called when a send completes."""
         if result < 0:
-            # Send error
-            import os
-
-            exc = OSError(-result, os.strerror(-result))
-            self._force_close(exc)
+            # Send error (should be handled by exception logic usually, but result code path)
+            # With future result, result is bytes written (positive).
+            # If error, exception is raised.
+            # So result should be >= 0.
             return
 
         # Reduce buffer size

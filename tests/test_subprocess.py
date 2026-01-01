@@ -20,96 +20,108 @@ def event_loop():
         loop.close()
 
 
+@pytest.mark.usefixtures("event_loop")
 class TestSubprocess:
     """Test subprocess functionality."""
 
-    @pytest.mark.asyncio
-    async def test_subprocess_exec_simple(self, event_loop):
+    def test_subprocess_exec_simple(self, loop):
         """Test simple subprocess execution."""
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", "print('hello')",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        
-        stdout, stderr = await proc.communicate()
-        
-        assert proc.returncode == 0
-        assert b"hello" in stdout
+        async def check():
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-c", "print('hello')",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            
+            stdout, stderr = await proc.communicate()
+            
+            assert proc.returncode == 0
+            assert b"hello" in stdout
 
-    @pytest.mark.asyncio
-    async def test_subprocess_shell(self, event_loop):
+        loop.run_until_complete(check())
+
+    def test_subprocess_shell(self, loop):
         """Test subprocess shell execution."""
-        proc = await asyncio.create_subprocess_shell(
-            "echo test",
-            stdout=asyncio.subprocess.PIPE,
-        )
+        async def check():
+            proc = await asyncio.create_subprocess_shell(
+                "echo test",
+                stdout=asyncio.subprocess.PIPE,
+            )
+            
+            stdout, _ = await proc.communicate()
+            
+            assert proc.returncode == 0
+            assert b"test" in stdout
         
-        stdout, _ = await proc.communicate()
-        
-        assert proc.returncode == 0
-        assert b"test" in stdout
+        loop.run_until_complete(check())
 
-    @pytest.mark.asyncio
-    async def test_subprocess_stdin_stdout(self, event_loop):
+    def test_subprocess_stdin_stdout(self, loop):
         """Test subprocess with stdin/stdout."""
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", "import sys; print(sys.stdin.read().upper())",
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-        )
+        async def check():
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-c", "import sys; print(sys.stdin.read().upper())",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+            )
+            
+            stdout, _ = await proc.communicate(input=b"hello world")
+            
+            assert proc.returncode == 0
+            assert b"HELLO WORLD" in stdout
         
-        stdout, _ = await proc.communicate(input=b"hello world")
-        
-        assert proc.returncode == 0
-        assert b"HELLO WORLD" in stdout
+        loop.run_until_complete(check())
 
-    @pytest.mark.asyncio
-    async def test_subprocess_exit_code(self, event_loop):
+    def test_subprocess_exit_code(self, loop):
         """Test subprocess exit codes."""
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", "import sys; sys.exit(42)",
-        )
-        
-        await proc.wait()
-        
-        assert proc.returncode == 42
-
-    @pytest.mark.asyncio
-    async def test_subprocess_timeout(self, event_loop):
-        """Test subprocess with timeout."""
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", "import time; time.sleep(10)",
-            stdout=asyncio.subprocess.PIPE,
-        )
-        
-        try:
-            await asyncio.wait_for(proc.communicate(), timeout=0.5)
-            assert False, "Should have timed out"
-        except asyncio.TimeoutError:
-            proc.kill()
+        async def check():
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-c", "import sys; sys.exit(42)",
+            )
+            
             await proc.wait()
-            assert proc.returncode is not None
+            
+            assert proc.returncode == 42
+        
+        loop.run_until_complete(check())
 
-    @pytest.mark.asyncio
-    async def test_subprocess_env(self, event_loop):
+    def test_subprocess_timeout(self, loop):
+        """Test subprocess with timeout."""
+        async def check():
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-c", "import time; time.sleep(10)",
+                stdout=asyncio.subprocess.PIPE,
+            )
+            
+            try:
+                await asyncio.wait_for(proc.communicate(), timeout=0.5)
+                assert False, "Should have timed out"
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                assert proc.returncode is not None
+
+        loop.run_until_complete(check())
+
+    def test_subprocess_env(self, loop):
         """Test subprocess with custom environment."""
-        env = os.environ.copy()
-        env["TEST_VAR"] = "test_value"
-        
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", 
-            "import os; print(os.environ.get('TEST_VAR', ''))",
-            stdout=asyncio.subprocess.PIPE,
-            env=env,
-        )
-        
-        stdout, _ = await proc.communicate()
-        
-        assert b"test_value" in stdout
+        async def check():
+            env = os.environ.copy()
+            env["TEST_VAR"] = "test_value"
+            
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-c", 
+                "import os; print(os.environ.get('TEST_VAR', ''))",
+                stdout=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            
+            stdout, _ = await proc.communicate()
+            
+            assert b"test_value" in stdout
 
-    @pytest.mark.asyncio
-    async def test_multiple_subprocesses(self, event_loop):
+        loop.run_until_complete(check())
+
+    def test_multiple_subprocesses(self, loop):
         """Test running multiple subprocesses concurrently."""
         async def run_echo(n):
             proc = await asyncio.create_subprocess_exec(
@@ -119,10 +131,15 @@ class TestSubprocess:
             stdout, _ = await proc.communicate()
             return int(stdout.strip())
         
-        results = await asyncio.gather(*[run_echo(i) for i in range(5)])
-        
-        assert set(results) == {0, 1, 2, 3, 4}
+        async def check():
+            results = await asyncio.gather(*[run_echo(i) for i in range(5)])
+            assert set(results) == {0, 1, 2, 3, 4}
 
+        loop.run_until_complete(check())
+
+@pytest.fixture
+def loop(event_loop):
+    return event_loop
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

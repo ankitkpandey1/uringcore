@@ -239,7 +239,69 @@ impl UringFuture {
     }
 }
 
+// Native Optimization Methods
 impl UringFuture {
+    pub(crate) fn set_result_fast(
+        &self,
+        py: Python<'_>,
+        scheduler: &crate::scheduler::Scheduler,
+        result: PyObject,
+        future_obj: PyObject,
+    ) -> PyResult<()> {
+        let mut state_guard = self.state.lock();
+        if !matches!(*state_guard, FutureState::Pending) {
+            return Err(PyValueError::new_err("Future is already done."));
+        }
+        *state_guard = FutureState::Finished(result);
+        drop(state_guard);
+
+        self.schedule_fast(py, scheduler, future_obj)
+    }
+
+    pub(crate) fn set_exception_fast(
+        &self,
+        py: Python<'_>,
+        scheduler: &crate::scheduler::Scheduler,
+        exception: PyObject,
+        future_obj: PyObject,
+    ) -> PyResult<()> {
+        let mut state_guard = self.state.lock();
+        if !matches!(*state_guard, FutureState::Pending) {
+            return Err(PyValueError::new_err("Future is already done."));
+        }
+        *state_guard = FutureState::Failed(exception);
+        drop(state_guard);
+
+        self.schedule_fast(py, scheduler, future_obj)
+    }
+
+    fn schedule_fast(
+        &self,
+        py: Python<'_>,
+        scheduler: &crate::scheduler::Scheduler,
+        future_obj: PyObject,
+    ) -> PyResult<()> {
+        let mut cb_guard = self.callbacks.lock();
+        let drained: Vec<_> = cb_guard.drain(..).collect();
+        drop(cb_guard);
+
+        for (func, ctx) in drained {
+            // Construct UringHandle directly
+            // args = (future_obj,)
+            let args_tuple = pyo3::types::PyTuple::new(py, vec![future_obj.clone_ref(py)])?;
+            let args: Py<pyo3::types::PyTuple> = args_tuple.into();
+
+            let handle =
+                crate::handle::UringHandle::new_native(func, args, self.loop_.clone_ref(py), ctx);
+            // handle must be converted to PyObject to store in scheduler
+            // Scheduler stores PyObject (handles)
+            let py_handle = Py::new(py, handle)?;
+
+            scheduler.push(py_handle.into_any());
+        }
+        Ok(())
+    }
+
     fn _schedule_callbacks(
         py: Python<'_>,
         callbacks: Arc<Mutex<Vec<(PyObject, Option<PyObject>)>>>,

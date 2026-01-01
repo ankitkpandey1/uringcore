@@ -92,6 +92,8 @@ pub struct UringCore {
     timers: TimerHeap,
     /// Task scheduler for Python callbacks
     scheduler: Scheduler,
+    /// Future map for Native Completion (FD -> Future)
+    futures: Mutex<HashMap<i32, PyObject>>,
 }
 
 #[pymethods]
@@ -136,6 +138,7 @@ impl UringCore {
             inflight_recv_buffers: Mutex::new(HashMap::new()),
             timers: TimerHeap::new(),
             scheduler: Scheduler::new(),
+            futures: Mutex::new(HashMap::new()),
         })
     }
 
@@ -341,8 +344,8 @@ impl UringCore {
     /// Submit a receive operation for a file descriptor.
     ///
     /// Acquires a buffer from the pool and submits a recv operation.
-    /// The completion will be delivered via `drain_completions()`.
-    fn submit_recv(&self, fd: i32) -> PyResult<()> {
+    /// The completion will be delivered via `run_tick` completion processing.
+    fn submit_recv(&self, fd: i32, future: PyObject) -> PyResult<()> {
         // Check if FD should accept new submissions
         if !self.fd_states.should_submit_recv(fd) {
             return Ok(()); // Backpressure or paused
@@ -359,7 +362,6 @@ impl UringCore {
         #[allow(clippy::cast_possible_truncation)]
         let buf_len = self.buffer_pool.buffer_size() as u32;
 
-        // Track inflight
         self.fd_states
             .with_state_mut(fd, state::FDState::on_submit)
             .map_err(|e| {
@@ -368,6 +370,9 @@ impl UringCore {
                     .release(buf_idx, self.buffer_pool.generation_id());
                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
             })?;
+
+        // Phase 4: Store future
+        self.futures.lock().insert(fd, future);
 
         // Submit to ring
         let gen = self.ring.lock().generation_u16();
@@ -379,12 +384,13 @@ impl UringCore {
                     // Release buffer on error
                     self.buffer_pool
                         .release(buf_idx, self.buffer_pool.generation_id());
+                    self.futures.lock().remove(&fd);
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
                 })?;
         }
 
         // Track inflight buffer for this FD (for completion data extraction)
-        self.inflight_recv_buffers.lock().insert(fd, buf_idx);
+        self.inflight_recv_buffers.lock().insert(fd, buf_idx); // u16 buf_idx check type
 
         // Flush to kernel
         self.ring
@@ -398,7 +404,7 @@ impl UringCore {
     /// Submit a send operation for a file descriptor.
     ///
     /// The data is copied to a buffer and submitted to `io_uring`.
-    fn submit_send(&self, fd: i32, data: &[u8]) -> PyResult<()> {
+    fn submit_send(&self, fd: i32, data: &[u8], future: PyObject) -> PyResult<()> {
         // Acquire a buffer from the pool
         let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available")
@@ -414,6 +420,8 @@ impl UringCore {
         #[allow(clippy::cast_possible_truncation)]
         let len = data.len() as u32;
 
+        self.futures.lock().insert(fd, future);
+
         // Submit to ring
         let gen = self.ring.lock().generation_u16();
         unsafe {
@@ -424,6 +432,7 @@ impl UringCore {
                     // Release buffer on error
                     self.buffer_pool
                         .release(buf_idx, self.buffer_pool.generation_id());
+                    self.futures.lock().remove(&fd);
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
                 })?;
         }
@@ -502,7 +511,8 @@ impl UringCore {
     // =========================================================================
 
     /// Push a handle to the ready queue.
-    fn push_ready(&self, handle: PyObject) {
+    #[allow(clippy::needless_pass_by_value)]
+    fn push_task(&self, handle: PyObject) {
         self.scheduler.push(handle);
     }
 
@@ -511,66 +521,189 @@ impl UringCore {
         self.scheduler.len()
     }
 
-    /// Process the ready queue.
-    /// Returns the number of handles processed.
-    fn run_ready(&self, py: Python<'_>) -> PyResult<usize> {
-        // Pop a batch to avoid infinite loops if handles schedule more handles
-        // We use a reasonably high limit (e.g. 10000) or just drain a snapshot.
-        // For strict fairness with I/O, we should limit.
-        let handles = self.scheduler.pop_batch(10000);
-        let count = handles.len();
+    /// Run one tick of the event loop.
+    ///
+    /// This method:
+    /// 1. Checks for expired timers -> moves to ready queue
+    /// 2. Submits/Polls I/O -> processes completions (callbacks)
+    /// 3. Executes ready tasks
+    #[pyo3(signature = (timeout=None))]
+    fn run_tick(&self, py: Python<'_>, timeout: Option<f64>) -> PyResult<usize> {
+        // 1. Process Timers (Native)
+        let n_timers = {
+            let mut ts = libc::timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            };
+            unsafe {
+                libc::clock_gettime(libc::CLOCK_MONOTONIC, &raw mut ts);
+            }
+            let now = ts.tv_sec as f64 + (ts.tv_nsec as f64 / 1_000_000_000.0);
 
-        for handle in handles {
-            // OPTIMIZATION: Check if it's our native UringHandle
-            // If so, call execute() directly (Rust-to-Rust), avoiding python method dispatch
-            if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
-                // It is a UringHandle!
-                // We need access to the Rust struct. `get()` gives Ref<UringHandle>
-                let refs = uring_handle.borrow();
-                if let Err(e) = refs.execute(py) {
-                    // Start simplified error handling
-                    // asyncio loop.set_exception_handler logic is hard to invoke from here correctly
-                    // without calling back into loop.
-                    // For now, we print or swallow, OR return Err to loop.py to handle.
-                    // loop.py calling run_tick() will see the exception.
-                    // But if we return, we abort the batch.
-                    // Asyncio usually logs and continues.
-                    eprintln!("Error in task: {e:?}");
-                    e.print(py);
+            let expired = self.timers.pop_expired(now);
+            let count = expired.len();
+            for handle in expired {
+                self.scheduler.push(handle);
+            }
+            count
+        };
+
+        // 2. Submit pending I/O (flush ring)
+        self.ring
+            .lock()
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        // 3. Process Completions (Native Phase 4)
+        let mut completed_io = 0;
+        {
+            let mut ring = self.ring.lock();
+            let completions = ring.drain_completions();
+
+            for cqe in completions {
+                completed_io += 1;
+                let fd = cqe.fd();
+                let result = cqe.result;
+                let op_type_str = cqe.op_type();
+
+                // Handle buffer release for recv / data extraction
+                let mut data_bytes: Option<PyObject> = None;
+
+                if matches!(op_type_str, OpType::Recv) {
+                    let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
+                    if let Some(buf_idx) = buf_idx_opt {
+                        if result > 0 {
+                            // Extract data
+                            let len = result as usize;
+                            // Correct safety: get buffer slice, copy to Python bytes
+                            unsafe {
+                                let slice = self.buffer_pool.get_buffer_slice(buf_idx, len);
+                                data_bytes = Some(pyo3::types::PyBytes::new(py, slice).into());
+                            }
+                        }
+                        self.buffer_pool
+                            .release(buf_idx, self.buffer_pool.generation_id());
+                    }
                 }
-            } else {
-                // Legacy asyncio.Handle or other
-                if let Err(e) = handle.bind(py).call_method0("_run") {
-                    // asyncio.Handle._run is the execution method
-                    eprintln!("Error in legacy task: {e:?}");
-                    e.print(py);
+
+                // Resolve Future
+                let future_opt = self.futures.lock().remove(&fd);
+                if let Some(future) = future_opt {
+                    if result < 0 {
+                        // Error
+                        let err = PyErr::new::<pyo3::exceptions::PyOSError, _>((
+                            -result,
+                            std::io::Error::from_raw_os_error(-result).to_string(),
+                        ));
+
+                        // Optimization: Check for native UringFuture
+                        if let Ok(uring_fut) =
+                            future.downcast_bound::<crate::future::UringFuture>(py)
+                        {
+                            if let Err(e) = uring_fut.borrow().set_exception_fast(
+                                py,
+                                &self.scheduler,
+                                err.into_pyobject(py)?.into(),
+                                future,
+                            ) {
+                                e.print(py);
+                            }
+                        } else {
+                            if let Err(e) = future.call_method1(py, "set_exception", (err,)) {
+                                e.print(py);
+                            }
+                        }
+                    } else {
+                        // Success
+                        if matches!(op_type_str, OpType::Recv) {
+                            if let Some(bytes) = data_bytes {
+                                if let Ok(uring_fut) =
+                                    future.downcast_bound::<crate::future::UringFuture>(py)
+                                {
+                                    if let Err(e) = uring_fut.borrow().set_result_fast(
+                                        py,
+                                        &self.scheduler,
+                                        bytes,
+                                        future,
+                                    ) {
+                                        e.print(py);
+                                    }
+                                } else {
+                                    if let Err(e) = future.call_method1(py, "set_result", (bytes,))
+                                    {
+                                        e.print(py);
+                                    }
+                                }
+                            } else {
+                                let empty = pyo3::types::PyBytes::new(py, &[]);
+                                if let Ok(uring_fut) =
+                                    future.downcast_bound::<crate::future::UringFuture>(py)
+                                {
+                                    if let Err(e) = uring_fut.borrow().set_result_fast(
+                                        py,
+                                        &self.scheduler,
+                                        empty.into(),
+                                        future,
+                                    ) {
+                                        e.print(py);
+                                    }
+                                } else {
+                                    if let Err(e) = future.call_method1(py, "set_result", (empty,))
+                                    {
+                                        e.print(py);
+                                    }
+                                }
+                            }
+                        } else {
+                            if let Ok(uring_fut) =
+                                future.downcast_bound::<crate::future::UringFuture>(py)
+                            {
+                                if let Err(e) = uring_fut.borrow().set_result_fast(
+                                    py,
+                                    &self.scheduler,
+                                    result.into_pyobject(py)?.into(),
+                                    future,
+                                ) {
+                                    e.print(py);
+                                }
+                            } else {
+                                if let Err(e) = future.call_method1(py, "set_result", (result,)) {
+                                    e.print(py);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        Ok(count)
-    }
+        // 4. Run ready tasks
+        let max_exec = 10000;
+        let mut executed = 0;
 
-    /// Run one tick of the event loop.
-    /// 1. Poll I/O if needed (not implemented here yet, separate `submit`).
-    /// 2. Check timers.
-    /// 3. Run ready queue.
-    fn run_tick(&self, py: Python<'_>) -> PyResult<usize> {
-        // Move expired timers to ready queue
-        // Move expired timers to ready queue
+        while let Some(handle) = self.scheduler.pop() {
+            if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
+                let refs = uring_handle.borrow();
+                if let Err(e) = refs.execute(py) {
+                    e.print(py);
+                }
+            } else if let Ok(task) = handle.downcast_bound::<task::UringTask>(py) {
+                if let Err(e) = task.borrow().run_step(py, task.as_unbound().clone_ref(py)) {
+                    e.print(py);
+                }
+            } else {
+                if let Err(e) = handle.bind(py).call_method0("_run") {
+                    e.print(py);
+                }
+            }
 
-        // Get monotonic time for timer comparison
-        let monotonic_now = py
-            .import("time")?
-            .call_method0("monotonic")?
-            .extract::<f64>()?;
-
-        let expired = self.timers.pop_expired(monotonic_now);
-        for handle in expired {
-            self.scheduler.push(handle);
+            executed += 1;
+            if executed >= max_exec {
+                break;
+            }
         }
 
-        self.run_ready(py)
+        Ok(n_timers + completed_io + executed)
     }
 }
 

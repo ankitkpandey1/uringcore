@@ -159,17 +159,144 @@ async def bench_call_soon():
     await future
 
 
+# Additional benchmarks
+
+async def bench_sleep_sequential():
+    """Sequential sleep(0)."""
+    for _ in range(10):
+        await asyncio.sleep(0)
+
+async def bench_sleep_concurrent_100():
+    """100 concurrent sleep(0)."""
+    async def noop():
+        await asyncio.sleep(0)
+    await asyncio.gather(*[noop() for _ in range(100)])
+
+async def bench_semaphore_acquire():
+    """Semaphore acquire/release."""
+    sem = asyncio.Semaphore(1)
+    async with sem:
+        pass
+
+async def bench_condition_notify():
+    """Condition wait/notify."""
+    cond = asyncio.Condition()
+    async def waiter():
+        async with cond:
+            await cond.wait()
+    
+    async def notifier():
+        async with cond:
+            cond.notify()
+            
+    t = asyncio.create_task(waiter())
+    # Ensure waiter is waiting
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    await notifier()
+    await t
+
+async def bench_context_vars():
+    """ContextVar propagation overhead."""
+    import contextvars
+    var = contextvars.ContextVar("bench", default=0)
+    var.set(1)
+    async def get_val():
+        return var.get()
+    await asyncio.create_task(get_val())
+
+async def bench_call_later():
+    """call_later scheduling overhead."""
+    loop = asyncio.get_event_loop()
+    future = loop.create_future()
+    loop.call_later(0.000001, future.set_result, 42)
+    await future
+
+async def bench_cancel_task():
+    """Task cancellation overhead."""
+    async def forever():
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            pass
+    t = asyncio.create_task(forever())
+    await asyncio.sleep(0)
+    t.cancel()
+    await t
+
+async def bench_shield_overhead():
+    """asyncio.shield overhead."""
+    async def noop():
+        pass
+    await asyncio.shield(noop())
+
+async def bench_wait_for_overhead():
+    """asyncio.wait_for overhead."""
+    async def noop():
+        pass
+    await asyncio.wait_for(noop(), timeout=10)
+
+async def bench_deep_recursion():
+    """Deep recursion/stack chain."""
+    async def recursive(n):
+        if n <= 0:
+            return
+        await recursive(n - 1)
+    await recursive(20)
+
+async def bench_exception_overhead():
+    """Exception propagation overhead."""
+    async def raiser():
+        raise ValueError("test")
+    try:
+        await raiser()
+    except ValueError:
+        pass
+
+async def bench_socketpair_overhead():
+    """Socketpair send/recv overhead (simulated networking)."""
+    import socket
+    rsock, wsock = socket.socketpair()
+    rsock.setblocking(False)
+    wsock.setblocking(False)
+    
+    loop = asyncio.get_event_loop()
+    
+    async def sender():
+        await loop.sock_sendall(wsock, b"x")
+        
+    async def receiver():
+        await loop.sock_recv(rsock, 1)
+        
+    await asyncio.gather(sender(), receiver())
+    
+    rsock.close()
+    wsock.close()
+
 # Benchmark configurations: (function, name, iterations)
 BENCHMARKS = [
     (bench_sleep_zero, "sleep(0)", 10000),
     (bench_create_task, "create_task", 5000),
     (bench_gather_10, "gather(10)", 2000),
     (bench_gather_100, "gather(100)", 500),
-    (bench_queue_put_get, "queue_put_get", 5000),
-    (bench_event_set_wait, "event_set_wait", 10000),
+    (bench_queue_put_get, "queue_put", 5000), # Renamed for brevity
+    (bench_event_set_wait, "event_wait", 5000),
     (bench_lock_acquire, "lock_acquire", 10000),
-    (bench_future_result, "future_result", 10000),
+    (bench_future_result, "future_res", 10000),
     (bench_call_soon, "call_soon", 10000),
+    # New benchmarks
+    (bench_sleep_sequential, "sleep_seq_10", 2000),
+    (bench_sleep_concurrent_100, "sleep_conc_100", 200),
+    (bench_semaphore_acquire, "semaphore", 10000),
+    (bench_condition_notify, "condition", 2000),
+    (bench_context_vars, "context_vars", 5000),
+    (bench_call_later, "call_later", 5000),
+    (bench_cancel_task, "task_cancel", 2000),
+    (bench_shield_overhead, "shield", 5000),
+    (bench_wait_for_overhead, "wait_for", 5000),
+    (bench_deep_recursion, "recursion_20", 2000),
+    (bench_exception_overhead, "exception", 10000),
+    (bench_socketpair_overhead, "sock_pair", 2000),
 ]
 
 
@@ -188,6 +315,7 @@ def run_suite_with_loop(loop_type: str, loop_factory: Callable) -> list[Benchmar
             print(f"  {name}: {result.avg_time_us:.2f} µs/op ({result.ops_per_sec:.0f} ops/sec)")
         finally:
             loop.close()
+            gc.collect() # Ensure resources are freed before next loop creation
     
     return results
 

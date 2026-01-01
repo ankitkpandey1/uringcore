@@ -78,7 +78,7 @@ use parking_lot::Mutex;
 use std::collections::HashMap;
 
 /// The main uringcore engine exposed to Python.
-#[pyclass]
+#[pyclass(module = "uringcore")]
 pub struct UringCore {
     /// The `io_uring` ring (wrapped in Mutex for interior mutability)
     ring: Mutex<Ring>,

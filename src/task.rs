@@ -293,14 +293,42 @@ impl UringTask {
     // Future Interface (Proxy)
     // =========================================================================
 
-    fn cancel(&self, py: Python<'_>) -> PyResult<PyObject> {
-        if self.future.call_method0(py, "done")?.is_truthy(py)? {
-            return Ok(pyo3::types::PyBool::new(py, false)
-                .to_owned()
-                .into_any()
-                .unbind());
+    fn cancel(slf: Py<Self>, py: Python<'_>) -> PyResult<bool> {
+        let refs = slf.borrow(py);
+        if refs.future.call_method0(py, "done")?.is_truthy(py)? {
+            return Ok(false);
         }
-        self.future.call_method0(py, "cancel")
+
+        // Set a cancellation flag on the task?
+        // We lack a mutable field we can easily access without unsafe or Mutex.
+        // We can just rely on standard scheduling:
+        
+        let loop_ = refs.loop_.clone_ref(py);
+        drop(refs);
+
+        // Schedule _step with a special sentinel or just schedule it.
+        // If we want to inject CancelledError, it's safest to construct it INSIDE _step
+        // or let _step check a flag. But we don't have a flag.
+        
+        // Let's pass the exception CLASS, not instance, and let throw handle it?
+        // Or better: Let's use Future::cancel which sets state to Cancelled.
+        // BUT the user issue is that we need to allow suppression.
+        
+        // Alternative: Just schedule call_soon with the exception instance, 
+        // effectively what we did, but checking `coro.throw` logic.
+        
+        // The previous error was TypeError.
+        // Let's rely on Python side to construct the error?
+        // We can pass a string "cancel" to _step?
+        
+        // Let's try simpler path:
+        let asyncio = py.import("asyncio")?;
+        let exc = asyncio.getattr("CancelledError")?.call0()?; // Intance
+        
+        let step_cb = slf.getattr(py, "_step")?;
+        loop_.call_method1(py, "call_soon", (step_cb, py.None(), exc))?;
+
+        Ok(true)
     }
 
     fn done(&self, py: Python<'_>) -> PyResult<PyObject> {

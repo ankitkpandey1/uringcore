@@ -523,12 +523,18 @@ impl Ring {
     /// Shutdown the ring.
     pub fn shutdown(&mut self) {
         self.is_active.store(false, Ordering::SeqCst);
+        // Explicitly unregister buffers to release locked memory immediately
+        if self.buffer_pool.is_some() {
+            let _ = self.ring.submitter().unregister_buffers();
+            // Clear the pool ref so we don't try again in drop or double-free (though io_uring is safe)
+            self.buffer_pool = None;
+        }
     }
 }
 
 impl Drop for Ring {
     fn drop(&mut self) {
-        // Explicitly unregister buffers to release locked memory immediately
+        // Fallback cleanup if shutdown wasn't called
         if self.buffer_pool.is_some() {
             let _ = self.ring.submitter().unregister_buffers();
         }

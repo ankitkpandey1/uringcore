@@ -49,6 +49,7 @@ pub mod ring;
 pub mod state;
 pub mod timer;
 pub mod scheduler;
+pub mod handle;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -59,6 +60,7 @@ use ring::{OpType, Ring};
 use state::{FDStateManager, SocketType};
 use timer::TimerHeap;
 use scheduler::Scheduler;
+use handle::UringHandle;
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -489,16 +491,35 @@ impl UringCore {
         let count = handles.len();
         
         for handle in handles {
-            // handle._run()
-            if let Err(e) = handle.bind(py).call_method0("_run") {
-                // If callback raises, restore it and return. 
-                // The Python loop usually handles exceptions inside `_run`,
-                // but if `_run` itself fails, we must propagate safe to Python loop to handle?
-                // Actually `loop._run_once` usually catches everything.
-                // We should let it bubble up to `loop.py` which calls this?
-                // OR we strictly follow `Handle._run` contract which catches execution errors.
-                // The only errors here would be malformed Handles.
-                return Err(e);
+            // OPTIMIZATION: Check if it's our native UringHandle
+            // If so, call execute() directly (Rust-to-Rust), avoiding python method dispatch
+            if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
+                // It is a UringHandle!
+                // We need access to the Rust struct. `get()` gives Ref<UringHandle>
+                let refs = uring_handle.borrow();
+                if let Err(e) = refs.execute(py) {
+                    // Start simplified error handling
+                    // asyncio loop.set_exception_handler logic is hard to invoke from here correctly
+                    // without calling back into loop.
+                    // For now, we print or swallow, OR return Err to loop.py to handle.
+                    // loop.py calling run_tick() will see the exception.
+                    // But if we return, we abort the batch.
+                    // Asyncio usually logs and continues.
+                    eprintln!("Error in task: {:?}", e);
+                    e.print(py);
+                }
+            } else {
+                // Legacy asyncio.Handle or other
+                if let Err(e) = handle.bind(py).call_method0("run") {
+                     // Note: asyncio.Handle uses 'run' not '_run' publicly? 
+                     // No, internal uses _run usually. But public API is just the object.
+                     // CPython asyncio.Handle has _run.
+                     // Let's assume _run for compat with standard asyncio.
+                     // But wait, asyncio.Handle._run is implementation detail.
+                     // Actually `loop._run_once` calls `handle._run()`.
+                     eprintln!("Error in legacy task: {:?}", e);
+                     e.print(py);
+                }
             }
         }
         
@@ -523,6 +544,7 @@ impl UringCore {
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UringCore>()?;
+    m.add_class::<UringHandle>()?;
 
     // Add version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;

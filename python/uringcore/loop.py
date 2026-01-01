@@ -408,14 +408,23 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     def call_soon(self, callback, *args, context=None):
         """Schedule a callback to be called soon."""
         self._check_closed()
-        handle = asyncio.Handle(callback, args, self, context)
-        self._ready.append(handle)
+        if self._debug:
+            self._check_callback(callback, 'call_soon')
+            
+        # Use Rust-native UringHandle for optimization
+        handle = self._core.UringHandle(callback, args, self, context)
+        self._core.push_ready(handle)
         return handle
 
     def call_soon_threadsafe(self, callback, *args, context=None):
         """Schedule a callback to be called from another thread."""
-        handle = self.call_soon(callback, *args, context=context)
-        self._core.signal()
+        self._check_closed()
+        if self._debug:
+            self._check_callback(callback, 'call_soon_threadsafe')
+            
+        handle = self._core.UringHandle(callback, args, self, context)
+        self._core.push_ready(handle)
+        self._write_to_self()
         return handle
 
     def call_later(self, delay, callback, *args, context=None):

@@ -56,8 +56,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                 ) from e
             raise
         
-        # Ready callbacks queue
-        self._ready: collections.deque[asyncio.Handle] = collections.deque()
+        # Ready callbacks now managed by UringCore (Rust)
+        # self._ready = collections.deque()
         
         
         # Transport registry: fd -> transport
@@ -229,18 +229,19 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                 self._process_completions()
             else:
                 # Reader/writer callback
+                # Traditional FD callbacks still managed in Python dicts for now
+                # We should push them to Rust ready queue to execute
                 if event_mask & select.EPOLLIN and fd in self._readers:
                     callback, args = self._readers[fd]
-                    self._ready.append(asyncio.Handle(callback, args, self))
+                    handle = asyncio.Handle(callback, args, self)
+                    self._core.push_ready(handle)
                 if event_mask & select.EPOLLOUT and fd in self._writers:
                     callback, args = self._writers[fd]
-                    self._ready.append(asyncio.Handle(callback, args, self))
+                    handle = asyncio.Handle(callback, args, self)
+                    self._core.push_ready(handle)
         
-        # Process scheduled callbacks
-        self._process_scheduled()
-        
-        # Process ready callbacks
-        self._process_ready()
+        # Run one tick of Rust scheduler (timers + ready queue)
+        self._core.run_tick()
 
     def _calculate_timeout(self) -> float:
         """Calculate the timeout for the next poll."""

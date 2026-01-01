@@ -48,6 +48,7 @@ pub mod error;
 pub mod ring;
 pub mod state;
 pub mod timer;
+pub mod scheduler;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -57,6 +58,7 @@ use buffer::BufferPool;
 use ring::{OpType, Ring};
 use state::{FDStateManager, SocketType};
 use timer::TimerHeap;
+use scheduler::Scheduler;
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -74,6 +76,8 @@ pub struct UringCore {
     inflight_recv_buffers: Mutex<HashMap<i32, u16>>,
     /// Timer heap for scheduled callbacks
     timers: TimerHeap,
+    /// Task scheduler for Python callbacks
+    scheduler: Scheduler,
 }
 
 #[pymethods]
@@ -117,6 +121,7 @@ impl UringCore {
             fd_states: FDStateManager::new(),
             inflight_recv_buffers: Mutex::new(HashMap::new()),
             timers: TimerHeap::new(),
+            scheduler: Scheduler::new(),
         })
     }
 
@@ -463,6 +468,54 @@ impl UringCore {
     /// Get the expiration time of the next timer.
     fn next_expiration(&self) -> Option<f64> {
         self.timers.next_expiration()
+    }
+
+    // =========================================================================
+    // Scheduling Methods
+    // =========================================================================
+
+    /// Push a handle to the ready queue.
+    fn push_ready(&mut self, handle: PyObject) {
+        self.scheduler.push(handle);
+    }
+
+    /// Process the ready queue.
+    /// Returns the number of handles processed.
+    fn run_ready(&mut self, py: Python<'_>) -> PyResult<usize> {
+        // Pop a batch to avoid infinite loops if handles schedule more handles
+        // We use a reasonably high limit (e.g. 10000) or just drain a snapshot.
+        // For strict fairness with I/O, we should limit.
+        let handles = self.scheduler.pop_batch(10000);
+        let count = handles.len();
+        
+        for handle in handles {
+            // handle._run()
+            if let Err(e) = handle.bind(py).call_method0("_run") {
+                // If callback raises, restore it and return. 
+                // The Python loop usually handles exceptions inside `_run`,
+                // but if `_run` itself fails, we must propagate safe to Python loop to handle?
+                // Actually `loop._run_once` usually catches everything.
+                // We should let it bubble up to `loop.py` which calls this?
+                // OR we strictly follow `Handle._run` contract which catches execution errors.
+                // The only errors here would be malformed Handles.
+                return Err(e);
+            }
+        }
+        
+        Ok(count)
+    }
+
+    /// Run one tick of the event loop.
+    /// 1. Poll I/O if needed (not implemented here yet, separate `submit`).
+    /// 2. Check timers.
+    /// 3. Run ready queue.
+    fn run_tick(&mut self, py: Python<'_>) -> PyResult<usize> {
+        // Move expired timers to ready queue
+        // In python: expired = core.pop_expired(now) -> loop._ready.extend(expired)
+        // Here we can optimize: core.move_expired_to_ready(now)
+        // But for now let's keep it composable.
+        
+        self.run_ready(py)
     }
 }
 

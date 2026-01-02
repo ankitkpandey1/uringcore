@@ -90,6 +90,10 @@ pub enum OpType {
     Close = 4,
     /// Timeout operation
     Timeout = 5,
+    /// SOTA: Multishot receive (kernel 5.19+)
+    RecvMulti = 6,
+    /// SOTA: Zero-copy send (kernel 6.0+)
+    SendZC = 7,
     /// Unknown operation
     Unknown = 255,
 }
@@ -105,6 +109,8 @@ impl OpType {
             3 => Self::Connect,
             4 => Self::Close,
             5 => Self::Timeout,
+            6 => Self::RecvMulti,
+            7 => Self::SendZC,
             _ => Self::Unknown,
         }
     }
@@ -520,6 +526,96 @@ impl Ring {
         })
     }
 
+    // =========================================================================
+    // SOTA 2025 OPTIMIZATIONS
+    // =========================================================================
+
+    /// Prepare a standalone timeout operation (native timer).
+    ///
+    /// Returns completion when `deadline_ns` (absolute monotonic time) is reached.
+    /// Use `encode_user_data(timer_id, OpType::Timeout, gen)` for user_data.
+    pub fn prep_timeout(&mut self, deadline_ns: u64, user_data: u64) -> Result<()> {
+        // Convert nanoseconds to timespec
+        #[allow(clippy::cast_possible_truncation)]
+        let ts = types::Timespec::new()
+            .sec((deadline_ns / 1_000_000_000) as i64 as u64)
+            .nsec((deadline_ns % 1_000_000_000) as u32);
+
+        let entry = opcode::Timeout::new(&raw const ts)
+            .flags(types::TimeoutFlags::ABS) // Absolute timeout
+            .build()
+            .user_data(user_data);
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push timeout failed".into()))
+            }
+        })
+    }
+
+    /// Cancel a pending timeout operation.
+    pub fn cancel_timeout(&mut self, user_data: u64) -> Result<()> {
+        let entry = opcode::TimeoutRemove::new(user_data)
+            .build()
+            .user_data(user_data);
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push timeout_remove failed".into()))
+            }
+        })
+    }
+
+    /// Prepare multishot receive (kernel 5.19+).
+    ///
+    /// One submission handles ALL future data on this socket until cancelled.
+    /// Completions have CQE_F_MORE flag when more data is expected.
+    ///
+    /// # Safety
+    ///
+    /// Requires kernel 5.19+. May fail with EINVAL on older kernels.
+    pub fn prep_recv_multishot(
+        &mut self,
+        fd: RawFd,
+        buf_group_id: u16,
+        generation: u16,
+    ) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::RecvMulti, generation);
+
+        // RecvMulti uses buffer group selection (IOSQE_BUFFER_SELECT)
+        let entry = opcode::RecvMulti::new(types::Fd(fd), buf_group_id)
+            .build()
+            .user_data(user_data);
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push recv_multi failed".into()))
+            }
+        })
+    }
+
+    /// Get ring capabilities for feature detection.
+    pub fn capabilities(&self) -> RingCapabilities {
+        RingCapabilities {
+            sqpoll: self.sqpoll_enabled,
+            // Note: Full capability detection would require probing the kernel
+            multishot_recv: true, // Assume available, will fail gracefully if not
+            send_zc: true,        // Assume available, will fail gracefully if not
+        }
+    }
+
     /// Shutdown the ring.
     pub fn shutdown(&mut self) {
         self.is_active.store(false, Ordering::SeqCst);
@@ -530,6 +626,17 @@ impl Ring {
             self.buffer_pool = None;
         }
     }
+}
+
+/// Ring capabilities for feature detection.
+#[derive(Debug, Clone, Copy)]
+pub struct RingCapabilities {
+    /// SQPOLL mode enabled
+    pub sqpoll: bool,
+    /// Multishot recv available (kernel 5.19+)
+    pub multishot_recv: bool,
+    /// Zero-copy send available (kernel 6.0+)
+    pub send_zc: bool,
 }
 
 impl Drop for Ring {

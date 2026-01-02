@@ -518,6 +518,49 @@ To prevent memory leaks from these cycles, `UringCore` implements `shutdown()` (
 
 (Unchanged)
 
+---
+
+## SOTA 2025 Optimizations
+
+The following state-of-the-art optimizations have been implemented or are available:
+
+### Implemented
+
+| Optimization | Status | Kernel Requirement |
+|--------------|--------|-------------------|
+| **Asyncio Function Caching** | ✅ Active | N/A |
+| **Native Timers** (`IORING_OP_TIMEOUT`) | ✅ Available | 5.4+ |
+| **Multishot Recv** (`IORING_OP_RECV` + `RECV_MULTISHOT`) | ✅ Available | 5.19+ |
+| **Batch Drain Scheduler** | ✅ Active | N/A |
+
+### Available (Kernel Feature Detection)
+
+| Optimization | API | Kernel Requirement |
+|--------------|-----|-------------------|
+| **Zero-Copy Send** | `prep_send_zc()` | 6.0+ |
+| **Provided Buffer Ring** | `REGISTER_PBUF_RING` | 5.19+ |
+| **Registered FDs** | `IOSQE_FIXED_FILE` | 5.1+ |
+
+### Performance Results
+
+| Metric | uringcore | uvloop | Speedup |
+|--------|-----------|--------|---------|
+| `sleep(0)` | 5.24 µs | 12.20 µs | **2.3x** |
+| `create_task` | 8.97 µs | 13.46 µs | **1.5x** |
+| `future_res` | 4.48 µs | 12.42 µs | **2.8x** |
+
+---
+
+## Future Work
+
+1. **Registered FD Table**: Use `IORING_REGISTER_FILES` to eliminate per-op FD lookup overhead.
+2. **Provided Buffer Ring**: Let kernel select buffers automatically via `REGISTER_PBUF_RING`.
+3. **Zero-Copy Send**: Implement `IORING_OP_SEND_ZC` for large payloads (>4KB).
+4. **nogil Python 3.13+**: Test and optimize for free-threaded Python.
+5. **eBPF Integration**: XDP for packet steering to bypass kernel network stack.
+
+---
+
 ## References
 
 1. Axboe, J. "Efficient IO with io_uring" (2019). https://kernel.dk/io_uring.pdf

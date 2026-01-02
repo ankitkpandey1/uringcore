@@ -241,6 +241,8 @@ impl UringCore {
                 OpType::Connect => "connect",
                 OpType::Close => "close",
                 OpType::Timeout => "timeout",
+                OpType::RecvMulti => "recv_multi",
+                OpType::SendZC => "send_zc",
                 OpType::Unknown => "unknown",
             };
 

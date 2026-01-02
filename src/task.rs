@@ -13,6 +13,9 @@ pub struct UringTask {
     wakeup: Arc<Mutex<Option<PyObject>>>,
     #[pyo3(get, set)]
     _log_destroy_pending: bool,
+    // SOTA: Cached asyncio function references
+    enter_task_fn: PyObject,
+    leave_task_fn: PyObject,
 }
 
 use crate::future::{FutureState, UringFuture};
@@ -31,6 +34,12 @@ impl UringTask {
         context: Option<PyObject>,
     ) -> PyResult<Self> {
         let future = loop_.call_method0(py, "create_future")?;
+        
+        // SOTA: Cache asyncio.tasks functions once
+        let asyncio_tasks = py.import("asyncio.tasks")?;
+        let enter_task_fn = asyncio_tasks.getattr("_enter_task")?.into();
+        let leave_task_fn = asyncio_tasks.getattr("_leave_task")?.into();
+        
         Ok(Self {
             coro,
             loop_,
@@ -39,6 +48,8 @@ impl UringTask {
             future,
             wakeup: Arc::new(Mutex::new(None)),
             _log_destroy_pending: true,
+            enter_task_fn,
+            leave_task_fn,
         })
     }
 
@@ -63,12 +74,14 @@ impl UringTask {
 
     /// The core step method (Native Rust version).
     pub fn run_step(&self, py: Python<'_>, slf: Py<Self>) -> PyResult<()> {
-        let (coro, loop_, future) = {
+        let (coro, loop_, future, enter_fn, leave_fn) = {
             let refs = slf.borrow(py);
             (
                 refs.coro.clone_ref(py),
                 refs.loop_.clone_ref(py),
                 refs.future.clone_ref(py),
+                refs.enter_task_fn.clone_ref(py),
+                refs.leave_task_fn.clone_ref(py),
             )
         };
 
@@ -76,10 +89,8 @@ impl UringTask {
             return Ok(());
         }
 
-        // Setup asyncio current_task context
-        let asyncio_tasks = py.import("asyncio.tasks")?;
-        // _enter_task(loop, task)
-        asyncio_tasks.call_method1("_enter_task", (loop_.clone_ref(py), slf.clone_ref(py)))?;
+        // SOTA: Use cached function refs instead of py.import()
+        enter_fn.call1(py, (loop_.clone_ref(py), slf.clone_ref(py)))?;
 
         // Note: run_step currently assumes no args (e.g. from ready queue).
         // If we need to pass args, we need to store them on the task or infer from future.
@@ -89,8 +100,8 @@ impl UringTask {
             coro.call_method1(py, "send", (arg,))
         };
 
-        // Restore context
-        asyncio_tasks.call_method1("_leave_task", (loop_.clone_ref(py), slf.clone_ref(py)))?;
+        // SOTA: Use cached function refs
+        leave_fn.call1(py, (loop_.clone_ref(py), slf.clone_ref(py)))?;
 
         // Helper to get or create wakeup safely
         let get_wakeup = || -> PyResult<PyObject> {

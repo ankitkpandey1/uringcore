@@ -5,7 +5,7 @@ import pytest
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse, JSONResponse
 from starlette.routing import Route
-from starlette.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 
 
 def homepage(request):
@@ -46,67 +46,67 @@ app = Starlette(
 )
 
 
+@pytest.mark.asyncio
 class TestStarletteBasic:
     """Basic Starlette integration tests."""
 
-    def test_homepage(self):
+    async def test_homepage(self):
         """Test homepage returns expected response."""
-        client = TestClient(app)
-        response = client.get("/")
-        assert response.status_code == 200
-        assert response.text == "Hello from Starlette!"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/")
+            assert response.status_code == 200
+            assert response.text == "Hello from Starlette!"
 
-    def test_json_response(self):
+    async def test_json_response(self):
         """Test JSON endpoint."""
-        client = TestClient(app)
-        response = client.get("/json")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == "Hello"
-        assert data["framework"] == "Starlette"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/json")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["message"] == "Hello"
+            assert data["framework"] == "Starlette"
 
-    def test_async_handler(self):
+    async def test_async_handler(self):
         """Test async handler with sleep."""
-        client = TestClient(app)
-        response = client.get("/async")
-        assert response.status_code == 200
-        assert response.text == "Async response"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/async")
+            assert response.status_code == 200
+            assert response.text == "Async response"
 
-    def test_echo_post(self):
+    async def test_echo_post(self):
         """Test echo POST endpoint."""
-        client = TestClient(app)
-        response = client.post("/echo", content="Hello World")
-        assert response.status_code == 200
-        assert response.text == "Hello World"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/echo", content="Hello World")
+            assert response.status_code == 200
+            assert response.text == "Hello World"
 
 
+@pytest.mark.asyncio
 class TestStarletteConcurrency:
     """Concurrency tests for Starlette."""
 
-    def test_multiple_requests(self):
+    async def test_multiple_requests(self):
         """Test multiple sequential requests."""
-        client = TestClient(app)
-        for i in range(10):
-            response = client.get("/")
-            assert response.status_code == 200
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            for i in range(10):
+                response = await client.get("/")
+                assert response.status_code == 200
 
-    def test_large_payload(self):
+    async def test_large_payload(self):
         """Test with larger payload."""
-        client = TestClient(app)
-        payload = "x" * 10000
-        response = client.post("/echo", content=payload)
-        assert response.status_code == 200
-        assert len(response.text) == 10000
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = "x" * 10000
+            response = await client.post("/echo", content=payload)
+            assert response.status_code == 200
+            assert len(response.text) == 10000
 
 
+@pytest.mark.asyncio
 class TestStarletteWithUringloop:
     """Tests specifically for uringcore integration."""
 
-    @pytest.mark.asyncio
     async def test_async_context(self):
         """Test that async context works properly."""
-        from starlette.testclient import TestClient
-        
         async def async_test():
             # Simple async operation
             await asyncio.sleep(0.001)
@@ -115,9 +115,10 @@ class TestStarletteWithUringloop:
         result = await async_test()
         assert result is True
 
-    def test_event_loop_type(self):
+    async def test_event_loop_type(self):
         """Verify event loop can be obtained."""
         # This test verifies asyncio works with the test client
-        client = TestClient(app)
-        response = client.get("/async")
-        assert response.status_code == 200
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/async")
+            assert response.status_code == 200
+

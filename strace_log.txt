@@ -1,0 +1,1626 @@
+40870 execve("/home/nkit_umar_andey/uringcore/.venv314/bin/python", ["python", "tests/repro_strace.py"], 0x7ffd8de21f40 /* 49 vars */) = 0
+40870 brk(NULL)                         = 0x56e68de34000
+40870 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3d92000
+40870 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/glibc-hwcaps/x86-64-v4/libpython3.14.so.1.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/glibc-hwcaps/x86-64-v4/", 0x7ffd7e8070d0, 0) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/glibc-hwcaps/x86-64-v3/libpython3.14.so.1.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/glibc-hwcaps/x86-64-v3/", 0x7ffd7e8070d0, 0) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/glibc-hwcaps/x86-64-v2/libpython3.14.so.1.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/glibc-hwcaps/x86-64-v2/", 0x7ffd7e8070d0, 0) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/libpython3.14.so.1.0", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=34175592, ...}) = 0
+40870 mmap(NULL, 6853064, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb3600000
+40870 mmap(0x7e0bb368f000, 3276800, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x8f000) = 0x7e0bb368f000
+40870 mmap(0x7e0bb39af000, 1581056, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3af000) = 0x7e0bb39af000
+40870 mmap(0x7e0bb3b31000, 946176, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x531000) = 0x7e0bb3b31000
+40870 mmap(0x7e0bb3c18000, 463304, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3c18000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=47439, ...}) = 0
+40870 mmap(NULL, 47439, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7e0bb3d86000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0@\247\2\0\0\0\0\0"..., 832) = 832
+40870 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 840, 64) = 840
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=2178688, ...}) = 0
+40870 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 840, 64) = 840
+40870 mmap(NULL, 2223736, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb3200000
+40870 mmap(0x7e0bb3228000, 1658880, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x28000) = 0x7e0bb3228000
+40870 mmap(0x7e0bb33bd000, 323584, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1bd000) = 0x7e0bb33bd000
+40870 mmap(0x7e0bb340c000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x20b000) = 0x7e0bb340c000
+40870 mmap(0x7e0bb3412000, 52856, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3412000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/libm.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1010032, ...}) = 0
+40870 mmap(NULL, 1007640, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb3c8f000
+40870 mmap(0x7e0bb3ca0000, 548864, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x11000) = 0x7e0bb3ca0000
+40870 mmap(0x7e0bb3d26000, 385024, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x97000) = 0x7e0bb3d26000
+40870 mmap(0x7e0bb3d84000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xf5000) = 0x7e0bb3d84000
+40870 close(3)                          = 0
+40870 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3c8d000
+40870 arch_prctl(ARCH_SET_FS, 0x7e0bb3c8dbc0) = 0
+40870 set_tid_address(0x7e0bb3c8de90)   = 40870
+40870 set_robust_list(0x7e0bb3c8dea0, 24) = 0
+40870 rseq(0x7e0bb3c8dae0, 0x20, 0, 0x53053053) = 0
+40870 mprotect(0x7e0bb340c000, 16384, PROT_READ) = 0
+40870 mprotect(0x7e0bb3d84000, 4096, PROT_READ) = 0
+40870 mprotect(0x7e0bb3b31000, 352256, PROT_READ) = 0
+40870 mprotect(0x56e68131e000, 4096, PROT_READ) = 0
+40870 mprotect(0x7e0bb3dce000, 8192, PROT_READ) = 0
+40870 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+40870 munmap(0x7e0bb3d86000, 47439)     = 0
+40870 getrandom("\x53\x6b\xe4\x4a\xcb\x64\x69\xe4\xaa\xda\x3a\x55\xf1\xd0\x21\xc2\x83\x08\xcd\xcc\xa3\x81\xb7\xf0\xc8\x72\x50\x94\xda\xed\xe8\xee", 32, GRND_NONBLOCK) = 32
+40870 open("/proc/sys/vm/overcommit_memory", O_RDONLY) = 3
+40870 read(3, "0\n", 32)                = 2
+40870 close(3)                          = 0
+40870 getrandom("\x53\x3c\xbb\x75\x97\x6d\x30\x3d", 8, GRND_NONBLOCK) = 8
+40870 brk(NULL)                         = 0x56e68de34000
+40870 brk(0x56e68de55000)               = 0x56e68de55000
+40870 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/usr/share/locale/locale.alias", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=2996, ...}) = 0
+40870 read(3, "# Locale name alias data base.\n#"..., 4096) = 2996
+40870 read(3, "", 4096)                 = 0
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/usr/lib/locale/C.UTF-8/LC_CTYPE", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/usr/lib/locale/C.utf8/LC_CTYPE", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=367708, ...}) = 0
+40870 mmap(NULL, 367708, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7e0bb35a6000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=27028, ...}) = 0
+40870 mmap(NULL, 27028, PROT_READ, MAP_SHARED, 3, 0) = 0x7e0bb3d8b000
+40870 close(3)                          = 0
+40870 futex(0x7e0bb341172c, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+40870 getcwd("/home/nkit_umar_andey/uringcore", 4096) = 32
+40870 getrandom("\x62\x1e\xb7\x4d\xf3\xc4\x21\x7c\x88\x07\xd4\x54\xea\xb7\x5d\xee\x07\x4e\xdb\xd3\x73\x37\x24\x62", 24, GRND_NONBLOCK) = 24
+40870 gettid()                          = 40870
+40870 openat(AT_FDCWD, "/proc/self/maps", O_RDONLY|O_CLOEXEC) = 3
+40870 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+40870 fstat(3, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+40870 read(3, "56e68131b000-56e68131c000 r--p 0"..., 1024) = 1024
+40870 read(3, "            /usr/lib/x86_64-linu"..., 1024) = 1024
+40870 read(3, "0587000 08:30 474271            "..., 1024) = 1024
+40870 read(3, "nu/ld-linux-x86-64.so.2\n7e0bb3d9"..., 1024) = 794
+40870 close(3)                          = 0
+40870 sched_getaffinity(40870, 32, [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]) = 8
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb34a6000
+40870 mmap(NULL, 266240, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3465000
+40870 mmap(NULL, 135168, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3444000
+40870 brk(0x56e68de76000)               = 0x56e68de76000
+40870 mmap(NULL, 16384, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3d87000
+40870 brk(0x56e68de97000)               = 0x56e68de97000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/bin/python", {st_mode=S_IFREG|0755, st_size=17776, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/pyvenv.cfg", O_RDONLY) = 3
+40870 fcntl(3, F_GETFD)                 = 0
+40870 fcntl(3, F_SETFD, FD_CLOEXEC)     = 0
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=299, ...}) = 0
+40870 read(3, "home = /home/nkit_umar_andey/.py"..., 32768) = 299
+40870 read(3, "", 28672)                = 0
+40870 close(3)                          = 0
+40870 readlink("/home/nkit_umar_andey/uringcore/.venv314/bin/python", "python3", 4096) = 7
+40870 readlink("/home/nkit_umar_andey/uringcore/.venv314/bin/python3", "/home/nkit_umar_andey/.pyenv/ver"..., 4096) = 56
+40870 readlink("/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/python3", "python3.14", 4096) = 10
+40870 readlink("/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/python3.14", 0x7ffd7e802470, 4096) = -1 EINVAL (Invalid argument)
+40870 readlink("/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/python3.14", 0x7ffd7e802470, 4096) = -1 EINVAL (Invalid argument)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/libpython3.14.so.1.0._pth", O_RDONLY) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/bin/python._pth", O_RDONLY) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/python3.14._pth", O_RDONLY) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/pybuilddir.txt", O_RDONLY) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/Modules/Setup.local", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/lib/python314.zip", 0x7ffd7e807150, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/lib/python3.14/os.py", 0x7ffd7e807150, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/lib/python3.14/os.pyc", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/lib/python314.zip", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/lib/python3.14/os.py", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/bin/lib/python3.14/os.pyc", 0x7ffd7e807440, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/os.py", {st_mode=S_IFREG|0644, st_size=41959, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3100000
+40870 brk(0x56e68deb8000)               = 0x56e68deb8000
+40870 openat(AT_FDCWD, "/etc/localtime", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=114, ...}) = 0
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=114, ...}) = 0
+40870 read(3, "TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 114
+40870 lseek(3, -60, SEEK_CUR)           = 54
+40870 read(3, "TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 60
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python314.zip", 0x7ffd7e806a20, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python314.zip", 0x7ffd7e806f70, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68dea1ec0 /* 200 entries */, 32768) = 6728
+40870 getdents64(3, 0x56e68dea1ec0 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e806f70, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__init__.abi3.so", 0x7ffd7e806f70, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__init__.so", 0x7ffd7e806f70, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__init__.py", {st_mode=S_IFREG|0644, st_size=5809, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__init__.py", {st_mode=S_IFREG|0644, st_size=5809, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fcntl(3, F_GETFD)                 = 0x1 (flags FD_CLOEXEC)
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=6523, ...}) = 0
+40870 mmap(NULL, 135168, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3423000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\261\26\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 6524) = 6523
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 munmap(0x7e0bb3423000, 135168)    = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68deaeff0 /* 126 entries */, 32768) = 4264
+40870 getdents64(3, 0x56e68deaeff0 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/aliases.py", {st_mode=S_IFREG|0644, st_size=15957, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/aliases.py", {st_mode=S_IFREG|0644, st_size=15957, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__pycache__/aliases.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=12596, ...}) = 0
+40870 brk(0x56e68def8000)               = 0x56e68def8000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViU>\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\25\0\0"..., 12597) = 12596
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/utf_8.py", {st_mode=S_IFREG|0644, st_size=1005, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/utf_8.py", {st_mode=S_IFREG|0644, st_size=1005, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__pycache__/utf_8.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=2370, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\355\3\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 2371) = 2370
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 rt_sigaction(SIGPIPE, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK, sa_restorer=0x7e0bb32458d0}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGXFSZ, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK, sa_restorer=0x7e0bb32458d0}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGHUP, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGINT, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGQUIT, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGILL, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGTRAP, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigprocmask(SIG_BLOCK, ~[], [], 8) = 0
+40870 rt_sigaction(SIGABRT, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+40870 rt_sigaction(SIGBUS, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGFPE, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGKILL, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGUSR1, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGSEGV, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGUSR2, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGPIPE, NULL, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK, sa_restorer=0x7e0bb32458d0}, 8) = 0
+40870 rt_sigaction(SIGALRM, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGTERM, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGSTKFLT, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGCHLD, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGCONT, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGSTOP, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGTSTP, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGTTIN, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGTTOU, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGURG, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGXCPU, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGXFSZ, NULL, {sa_handler=SIG_IGN, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK, sa_restorer=0x7e0bb32458d0}, 8) = 0
+40870 rt_sigaction(SIGVTALRM, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGPROF, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGWINCH, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGIO, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGPWR, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGSYS, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_2, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_3, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_4, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_5, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_6, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_7, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_8, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_9, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_10, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_11, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_12, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_13, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_14, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_15, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_16, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_17, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_18, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_19, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_20, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_21, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_22, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_23, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_24, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_25, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_26, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_27, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_28, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_29, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_30, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_31, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGRT_32, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 rt_sigaction(SIGINT, {sa_handler=0x7e0bb393eda0, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK, sa_restorer=0x7e0bb32458d0}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+40870 fstat(0, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0xc), ...}) = 0
+40870 fcntl(0, F_GETFD)                 = 0
+40870 fstat(0, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0xc), ...}) = 0
+40870 ioctl(0, TCGETS, {c_iflag=BRKINT|ICRNL|IXON|IXANY|IMAXBEL|IUTF8, c_oflag=NL0|CR0|TAB0|BS0|VT0|FF0|OPOST|ONLCR, c_cflag=B38400|CS8|CREAD|HUPCL, c_lflag=ISIG|ICANON|ECHO|ECHOE|ECHOK|IEXTEN|ECHOCTL|ECHOKE, ...}) = 0
+40870 lseek(0, 0, SEEK_CUR)             = -1 ESPIPE (Illegal seek)
+40870 ioctl(0, TCGETS, {c_iflag=BRKINT|ICRNL|IXON|IXANY|IMAXBEL|IUTF8, c_oflag=NL0|CR0|TAB0|BS0|VT0|FF0|OPOST|ONLCR, c_cflag=B38400|CS8|CREAD|HUPCL, c_lflag=ISIG|ICANON|ECHO|ECHOE|ECHOK|IEXTEN|ECHOCTL|ECHOKE, ...}) = 0
+40870 fcntl(1, F_GETFD)                 = 0
+40870 fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0xc), ...}) = 0
+40870 ioctl(1, TCGETS, {c_iflag=BRKINT|ICRNL|IXON|IXANY|IMAXBEL|IUTF8, c_oflag=NL0|CR0|TAB0|BS0|VT0|FF0|OPOST|ONLCR, c_cflag=B38400|CS8|CREAD|HUPCL, c_lflag=ISIG|ICANON|ECHO|ECHOE|ECHOK|IEXTEN|ECHOCTL|ECHOKE, ...}) = 0
+40870 lseek(1, 0, SEEK_CUR)             = -1 ESPIPE (Illegal seek)
+40870 ioctl(1, TCGETS, {c_iflag=BRKINT|ICRNL|IXON|IXANY|IMAXBEL|IUTF8, c_oflag=NL0|CR0|TAB0|BS0|VT0|FF0|OPOST|ONLCR, c_cflag=B38400|CS8|CREAD|HUPCL, c_lflag=ISIG|ICANON|ECHO|ECHOE|ECHOK|IEXTEN|ECHOCTL|ECHOKE, ...}) = 0
+40870 fcntl(2, F_GETFD)                 = 0
+40870 fstat(2, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0xc), ...}) = 0
+40870 ioctl(2, TCGETS, {c_iflag=BRKINT|ICRNL|IXON|IXANY|IMAXBEL|IUTF8, c_oflag=NL0|CR0|TAB0|BS0|VT0|FF0|OPOST|ONLCR, c_cflag=B38400|CS8|CREAD|HUPCL, c_lflag=ISIG|ICANON|ECHO|ECHOE|ECHOK|IEXTEN|ECHOCTL|ECHOKE, ...}) = 0
+40870 brk(0x56e68df38000)               = 0x56e68df38000
+40870 lseek(2, 0, SEEK_CUR)             = -1 ESPIPE (Illegal seek)
+40870 ioctl(2, TCGETS, {c_iflag=BRKINT|ICRNL|IXON|IXANY|IMAXBEL|IUTF8, c_oflag=NL0|CR0|TAB0|BS0|VT0|FF0|OPOST|ONLCR, c_cflag=B38400|CS8|CREAD|HUPCL, c_lflag=ISIG|ICANON|ECHO|ECHOE|ECHOK|IEXTEN|ECHOCTL|ECHOKE, ...}) = 0
+40870 brk(0x56e68df59000)               = 0x56e68df59000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/bin/pyvenv.cfg", 0x7ffd7e8068a0, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/pyvenv.cfg", {st_mode=S_IFREG|0644, st_size=299, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/pyvenv.cfg", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=299, ...}) = 0
+40870 brk(0x56e68df88000)               = 0x56e68df88000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "home = /home/nkit_umar_andey/.py"..., 8192) = 299
+40870 read(3, "", 8192)                 = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df47a60 /* 107 entries */, 32768) = 4320
+40870 getdents64(3, 0x56e68df47a60 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages/uringcore.pth", {st_mode=S_IFREG|0644, st_size=38, ...}, AT_SYMLINK_NOFOLLOW) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages/uringcore.pth", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=38, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "/home/nkit_umar_andey/uringcore/"..., 39) = 38
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/utf_8_sig.py", {st_mode=S_IFREG|0644, st_size=4133, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/utf_8_sig.py", {st_mode=S_IFREG|0644, st_size=4133, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/encodings/__pycache__/utf_8_sig.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=7240, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi%\20\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 7241) = 7240
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df4fe10 /* 107 entries */, 32768) = 4320
+40870 getdents64(3, 0x56e68df4fe10 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages/uringcore.pth", {st_mode=S_IFREG|0644, st_size=38, ...}, AT_SYMLINK_NOFOLLOW) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages/uringcore.pth", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=38, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "/home/nkit_umar_andey/uringcore/"..., 39) = 38
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df4fe10 /* 77 entries */, 32768) = 4904
+40870 getdents64(3, 0x56e68df4fe10 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df4fe10 /* 107 entries */, 32768) = 4320
+40870 getdents64(3, 0x56e68df4fe10 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df4fe10 /* 3 entries */, 32768) = 80
+40870 getdents64(3, 0x56e68df4fe10 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests/repro_strace.py", {st_mode=S_IFREG|0644, st_size=978, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests/repro_strace.py", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=978, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_END)             = 978
+40870 lseek(3, 0, SEEK_CUR)             = 978
+40870 lseek(3, 0, SEEK_SET)             = 0
+40870 read(3, "\nimport asyncio\nimport uringcore"..., 131072) = 978
+40870 read(3, "", 130094)               = 0
+40870 lseek(3, 0, SEEK_SET)             = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests/repro_strace.py", {st_mode=S_IFREG|0644, st_size=978, ...}, 0) = 0
+40870 readlink("tests/repro_strace.py", 0x7ffd7e7f6cc0, 4096) = -1 EINVAL (Invalid argument)
+40870 getcwd("/home/nkit_umar_andey/uringcore", 1024) = 32
+40870 readlink("/home/nkit_umar_andey/uringcore/tests", 0x7ffd7e7f6860, 1023) = -1 EINVAL (Invalid argument)
+40870 readlink("/home/nkit_umar_andey/uringcore/tests/repro_strace.py", 0x7ffd7e7f6860, 1023) = -1 EINVAL (Invalid argument)
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests/repro_strace.py", O_RDONLY) = 3
+40870 ioctl(3, FIOCLEX)                 = 0
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=978, ...}) = 0
+40870 ioctl(3, TCGETS, 0x7ffd7e807c70)  = -1 ENOTTY (Inappropriate ioctl for device)
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=978, ...}) = 0
+40870 read(3, "\nimport asyncio\nimport uringcore"..., 4096) = 978
+40870 lseek(3, 0, SEEK_SET)             = 0
+40870 read(3, "\nimport asyncio\nimport uringcore"..., 4096) = 978
+40870 read(3, "", 4096)                 = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df67bd0 /* 26 entries */, 32768) = 1000
+40870 getdents64(3, 0x56e68df67bd0 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e807080, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__init__.abi3.so", 0x7ffd7e807080, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__init__.so", 0x7ffd7e807080, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__init__.py", {st_mode=S_IFREG|0644, st_size=2413, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__init__.py", {st_mode=S_IFREG|0644, st_size=2413, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=3167, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vim\t\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 3168) = 3167
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df67bd0 /* 38 entries */, 32768) = 1320
+40870 getdents64(3, 0x56e68df67bd0 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_events.py", {st_mode=S_IFREG|0644, st_size=80683, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_events.py", {st_mode=S_IFREG|0644, st_size=80683, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/base_events.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=92222, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68dfbf000)               = 0x56e68dfbf000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi+;\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 92223) = 92222
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 brk(0x56e68df8f000)               = 0x56e68df8f000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/collections/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e805b60, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/collections/__init__.abi3.so", 0x7ffd7e805b60, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/collections/__init__.so", 0x7ffd7e805b60, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/collections/__init__.py", {st_mode=S_IFREG|0644, st_size=52903, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/collections/__init__.py", {st_mode=S_IFREG|0644, st_size=52903, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/collections/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=74799, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68dfc1000)               = 0x56e68dfc1000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\247\316\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 74800) = 74799
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 brk(0x56e68df91000)               = 0x56e68df91000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/keyword.py", {st_mode=S_IFREG|0644, st_size=1073, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/keyword.py", {st_mode=S_IFREG|0644, st_size=1073, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/keyword.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1571, ...}) = 0
+40870 brk(0x56e68dfb7000)               = 0x56e68dfb7000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi1\4\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\3\0\0"..., 1572) = 1571
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/operator.py", {st_mode=S_IFREG|0644, st_size=11158, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/operator.py", {st_mode=S_IFREG|0644, st_size=11158, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/operator.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=19036, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\226+\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 19037) = 19036
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3000000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/reprlib.py", {st_mode=S_IFREG|0644, st_size=8064, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/reprlib.py", {st_mode=S_IFREG|0644, st_size=8064, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/reprlib.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=11720, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\200\37\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 11721) = 11720
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e805510, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/__init__.abi3.so", 0x7ffd7e805510, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/__init__.so", 0x7ffd7e805510, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/__init__.py", {st_mode=S_IFREG|0644, st_size=38, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/__init__.py", {st_mode=S_IFREG|0644, st_size=38, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=181, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi&\0\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\1\0\0"..., 182) = 181
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df83530 /* 6 entries */, 32768) = 176
+40870 getdents64(3, 0x56e68df83530 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e805b60, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/__init__.abi3.so", 0x7ffd7e805b60, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/__init__.so", 0x7ffd7e805b60, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/__init__.py", {st_mode=S_IFREG|0644, st_size=1863, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/__init__.py", {st_mode=S_IFREG|0644, st_size=1863, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1638, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViG\7\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 1639) = 1638
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68df83530 /* 8 entries */, 32768) = 248
+40870 getdents64(3, 0x56e68df83530 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/_base.py", {st_mode=S_IFREG|0644, st_size=24092, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/_base.py", {st_mode=S_IFREG|0644, st_size=24092, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/concurrent/futures/__pycache__/_base.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=34581, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\34^\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\n\0\0"..., 34582) = 34581
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/logging/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e804640, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/logging/__init__.abi3.so", 0x7ffd7e804640, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/logging/__init__.so", 0x7ffd7e804640, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/logging/__init__.py", {st_mode=S_IFREG|0644, st_size=83833, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/logging/__init__.py", {st_mode=S_IFREG|0644, st_size=83833, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/logging/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=96771, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68dfdf000)               = 0x56e68dfdf000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViyG\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\20\0\0"..., 96772) = 96771
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 brk(0x56e68dfaf000)               = 0x56e68dfaf000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e803bb0, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__init__.abi3.so", 0x7ffd7e803bb0, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__init__.so", 0x7ffd7e803bb0, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__init__.py", {st_mode=S_IFREG|0644, st_size=17876, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__init__.py", {st_mode=S_IFREG|0644, st_size=17876, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=20005, ...}) = 0
+40870 brk(0x56e68dfd1000)               = 0x56e68dfd1000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\324E\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\10\0\0"..., 20006) = 20005
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/enum.py", {st_mode=S_IFREG|0644, st_size=85416, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/enum.py", {st_mode=S_IFREG|0644, st_size=85416, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/enum.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=88012, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\250M\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\t\0\0"..., 88013) = 88012
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/types.py", {st_mode=S_IFREG|0644, st_size=11342, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/types.py", {st_mode=S_IFREG|0644, st_size=11342, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/types.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=15653, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViN,\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 15654) = 15653
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68dfab550 /* 8 entries */, 32768) = 248
+40870 getdents64(3, 0x56e68dfab550 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_compiler.py", {st_mode=S_IFREG|0644, st_size=26855, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_compiler.py", {st_mode=S_IFREG|0644, st_size=26855, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__pycache__/_compiler.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=29703, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68dff3000)               = 0x56e68dff3000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\347h\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\10\0\0"..., 29704) = 29703
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_parser.py", {st_mode=S_IFREG|0644, st_size=40353, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_parser.py", {st_mode=S_IFREG|0644, st_size=40353, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__pycache__/_parser.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=45293, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\241\235\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\27\0\0"..., 45294) = 45293
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 mmap(NULL, 208896, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb2fcd000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_constants.py", {st_mode=S_IFREG|0644, st_size=6036, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_constants.py", {st_mode=S_IFREG|0644, st_size=6036, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__pycache__/_constants.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=5663, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\224\27\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\24\0\0"..., 5664) = 5663
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_casefix.py", {st_mode=S_IFREG|0644, st_size=5444, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/_casefix.py", {st_mode=S_IFREG|0644, st_size=5444, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/re/__pycache__/_casefix.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1848, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViD\25\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 1849) = 1848
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/functools.py", {st_mode=S_IFREG|0644, st_size=43561, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/functools.py", {st_mode=S_IFREG|0644, st_size=43561, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/functools.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=48047, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi)\252\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\v\0\0"..., 48048) = 48047
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/copyreg.py", {st_mode=S_IFREG|0644, st_size=7716, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/copyreg.py", {st_mode=S_IFREG|0644, st_size=7716, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/copyreg.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=7956, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi$\36\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 7957) = 7956
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/traceback.py", {st_mode=S_IFREG|0644, st_size=70248, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/traceback.py", {st_mode=S_IFREG|0644, st_size=70248, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/traceback.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=78948, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vih\22\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 78949) = 78948
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/linecache.py", {st_mode=S_IFREG|0644, st_size=7840, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/linecache.py", {st_mode=S_IFREG|0644, st_size=7840, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/linecache.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=9424, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\240\36\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 9425) = 9424
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/textwrap.py", {st_mode=S_IFREG|0644, st_size=19382, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/textwrap.py", {st_mode=S_IFREG|0644, st_size=19382, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/textwrap.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=18474, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\266K\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 18475) = 18474
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/warnings.py", {st_mode=S_IFREG|0644, st_size=1966, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/warnings.py", {st_mode=S_IFREG|0644, st_size=1966, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/warnings.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=2536, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\256\7\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 2537) = 2536
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_py_warnings.py", {st_mode=S_IFREG|0644, st_size=30651, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_py_warnings.py", {st_mode=S_IFREG|0644, st_size=30651, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/_py_warnings.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=37020, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\273w\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 37021) = 37020
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/codeop.py", {st_mode=S_IFREG|0644, st_size=5902, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/codeop.py", {st_mode=S_IFREG|0644, st_size=5902, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/codeop.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=6998, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\16\27\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\7\0\0"..., 6999) = 6998
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__future__.py", {st_mode=S_IFREG|0644, st_size=5218, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__future__.py", {st_mode=S_IFREG|0644, st_size=5218, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/__future__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4818, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vib\24\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 4819) = 4818
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb2ecd000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/tokenize.py", {st_mode=S_IFREG|0644, st_size=21849, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/tokenize.py", {st_mode=S_IFREG|0644, st_size=21849, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/tokenize.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=26984, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68e016000)               = 0x56e68e016000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViYU\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\n\0\0"..., 26985) = 26984
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/token.py", {st_mode=S_IFREG|0644, st_size=2584, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/token.py", {st_mode=S_IFREG|0644, st_size=2584, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/token.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=3914, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\30\n\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\35\0\0"..., 3915) = 3914
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_colorize.py", {st_mode=S_IFREG|0644, st_size=11031, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_colorize.py", {st_mode=S_IFREG|0644, st_size=11031, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/_colorize.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=18557, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\27+\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\7\0\0"..., 18558) = 18557
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/dataclasses.py", {st_mode=S_IFREG|0644, st_size=71358, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/dataclasses.py", {st_mode=S_IFREG|0644, st_size=71358, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/dataclasses.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=54816, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\276\26\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\34\0\0"..., 54817) = 54816
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/copy.py", {st_mode=S_IFREG|0644, st_size=8582, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/copy.py", {st_mode=S_IFREG|0644, st_size=8582, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/copy.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=10152, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\206!\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\24\0\0"..., 10153) = 10152
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/weakref.py", {st_mode=S_IFREG|0644, st_size=17771, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/weakref.py", {st_mode=S_IFREG|0644, st_size=17771, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/weakref.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=27670, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212VikE\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 27671) = 27670
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_weakrefset.py", {st_mode=S_IFREG|0644, st_size=3962, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_weakrefset.py", {st_mode=S_IFREG|0644, st_size=3962, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/_weakrefset.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=9441, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Viz\17\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 9442) = 9441
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/inspect.py", {st_mode=S_IFREG|0644, st_size=127190, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/inspect.py", {st_mode=S_IFREG|0644, st_size=127190, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/inspect.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=139491, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 mmap(NULL, 143360, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb3421000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\326\360\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\f\0\0"..., 139492) = 139491
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 munmap(0x7e0bb3421000, 143360)    = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/annotationlib.py", {st_mode=S_IFREG|0644, st_size=42034, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/annotationlib.py", {st_mode=S_IFREG|0644, st_size=42034, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/annotationlib.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=46718, ...}) = 0
+40870 brk(0x56e68e045000)               = 0x56e68e045000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi2\244\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\10\0\0"..., 46719) = 46718
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/ast.py", {st_mode=S_IFREG|0644, st_size=25479, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/ast.py", {st_mode=S_IFREG|0644, st_size=25479, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/ast.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=31634, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\207c\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\7\0\0"..., 31635) = 31634
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/dis.py", {st_mode=S_IFREG|0644, st_size=45533, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/dis.py", {st_mode=S_IFREG|0644, st_size=45533, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/dis.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=54264, ...}) = 0
+40870 brk(0x56e68e06b000)               = 0x56e68e06b000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\335\261\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\30\0\0"..., 54265) = 54264
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/opcode.py", {st_mode=S_IFREG|0644, st_size=3152, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/opcode.py", {st_mode=S_IFREG|0644, st_size=3152, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/opcode.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4528, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViP\f\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\n\0\0"..., 4529) = 4528
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_opcode_metadata.py", {st_mode=S_IFREG|0644, st_size=10115, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/_opcode_metadata.py", {st_mode=S_IFREG|0644, st_size=10115, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/_opcode_metadata.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=10442, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\203'\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 10443) = 10442
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/importlib/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e800b20, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/importlib/__init__.abi3.so", 0x7ffd7e800b20, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/importlib/__init__.so", 0x7ffd7e800b20, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/importlib/__init__.py", {st_mode=S_IFREG|0644, st_size=4767, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/importlib/__init__.py", {st_mode=S_IFREG|0644, st_size=4767, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/importlib/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4655, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\237\22\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 4656) = 4655
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 brk(0x56e68e08c000)               = 0x56e68e08c000
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb2dcd000
+40870 brk(0x56e68e0ae000)               = 0x56e68e0ae000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/contextlib.py", {st_mode=S_IFREG|0644, st_size=27801, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/contextlib.py", {st_mode=S_IFREG|0644, st_size=27801, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/contextlib.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=31176, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\231l\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\7\0\0"..., 31177) = 31176
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/string/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e803bb0, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/string/__init__.abi3.so", 0x7ffd7e803bb0, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/string/__init__.so", 0x7ffd7e803bb0, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/string/__init__.py", {st_mode=S_IFREG|0644, st_size=12355, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/string/__init__.py", {st_mode=S_IFREG|0644, st_size=12355, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/string/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=12912, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViC0\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 12913) = 12912
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/threading.py", {st_mode=S_IFREG|0644, st_size=56923, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/threading.py", {st_mode=S_IFREG|0644, st_size=56923, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/threading.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=66528, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68e0d5000)               = 0x56e68e0d5000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi[\336\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 66529) = 66528
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 brk(0x56e68e0a5000)               = 0x56e68e0a5000
+40870 gettid()                          = 40870
+40870 brk(0x56e68e0d5000)               = 0x56e68e0d5000
+40870 brk(0x56e68e0a5000)               = 0x56e68e0a5000
+40870 brk(0x56e68e0d5000)               = 0x56e68e0d5000
+40870 brk(0x56e68e0a5000)               = 0x56e68e0a5000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_interpreters.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=145088, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_interpreters.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=145088, ...}) = 0
+40870 mmap(NULL, 43224, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb3439000
+40870 mmap(0x7e0bb343c000, 16384, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3000) = 0x7e0bb343c000
+40870 mmap(0x7e0bb3440000, 8192, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x7000) = 0x7e0bb3440000
+40870 mmap(0x7e0bb3442000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x8000) = 0x7e0bb3442000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb3442000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/heapq.py", {st_mode=S_IFREG|0644, st_size=23440, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/heapq.py", {st_mode=S_IFREG|0644, st_size=23440, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/heapq.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=18637, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\220[\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 18638) = 18637
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_heapq.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=76288, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_heapq.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=76288, ...}) = 0
+40870 mmap(NULL, 29352, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb3431000
+40870 mmap(0x7e0bb3432000, 8192, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1000) = 0x7e0bb3432000
+40870 mmap(0x7e0bb3434000, 12288, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3000) = 0x7e0bb3434000
+40870 mmap(0x7e0bb3437000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x5000) = 0x7e0bb3437000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb3437000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/socket.py", {st_mode=S_IFREG|0644, st_size=37275, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/socket.py", {st_mode=S_IFREG|0644, st_size=37275, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/socket.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=43003, ...}) = 0
+40870 brk(0x56e68e0c6000)               = 0x56e68e0c6000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\233\221\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\25\0\0"..., 43004) = 43003
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_socket.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=484088, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_socket.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=484088, ...}) = 0
+40870 mmap(NULL, 118608, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2db0000
+40870 mmap(0x7e0bb2db4000, 57344, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x4000) = 0x7e0bb2db4000
+40870 mmap(0x7e0bb2dc2000, 36864, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x12000) = 0x7e0bb2dc2000
+40870 mmap(0x7e0bb2dcb000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1a000) = 0x7e0bb2dcb000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb2dcb000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/subprocess.py", {st_mode=S_IFREG|0644, st_size=90780, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/subprocess.py", {st_mode=S_IFREG|0644, st_size=90780, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/subprocess.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=85039, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68e0ee000)               = 0x56e68e0ee000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\234b\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\10\0\0"..., 85040) = 85039
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/locale.py", {st_mode=S_IFREG|0644, st_size=79129, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/locale.py", {st_mode=S_IFREG|0644, st_size=79129, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/locale.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=59945, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\0315\1\0\343\0\0\0\0\0\0\0\0\0\0\0\0\25\0\0"..., 59946) = 59945
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/signal.py", {st_mode=S_IFREG|0644, st_size=2495, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/signal.py", {st_mode=S_IFREG|0644, st_size=2495, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/signal.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4623, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\277\t\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 4624) = 4623
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/fcntl.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=56200, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/fcntl.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=56200, ...}) = 0
+40870 mmap(NULL, 29352, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb3429000
+40870 mmap(0x7e0bb342b000, 8192, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7e0bb342b000
+40870 mmap(0x7e0bb342d000, 8192, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x4000) = 0x7e0bb342d000
+40870 mmap(0x7e0bb342f000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x5000) = 0x7e0bb342f000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb342f000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_posixsubprocess.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=140248, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_posixsubprocess.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=140248, ...}) = 0
+40870 mmap(NULL, 29488, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb3421000
+40870 mmap(0x7e0bb3423000, 12288, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7e0bb3423000
+40870 mmap(0x7e0bb3426000, 4096, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x5000) = 0x7e0bb3426000
+40870 mmap(0x7e0bb3427000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x5000) = 0x7e0bb3427000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb3427000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/select.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=204648, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/select.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=204648, ...}) = 0
+40870 mmap(NULL, 34872, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2da7000
+40870 mmap(0x7e0bb2da9000, 12288, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7e0bb2da9000
+40870 mmap(0x7e0bb2dac000, 8192, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x5000) = 0x7e0bb2dac000
+40870 mmap(0x7e0bb2dae000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x6000) = 0x7e0bb2dae000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb2dae000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/selectors.py", {st_mode=S_IFREG|0644, st_size=19457, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/selectors.py", {st_mode=S_IFREG|0644, st_size=19457, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/selectors.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=27099, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\1L\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 27100) = 27099
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/math.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=421472, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/math.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=421472, ...}) = 0
+40870 mmap(NULL, 89064, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2d91000
+40870 mmap(0x7e0bb2d94000, 49152, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3000) = 0x7e0bb2d94000
+40870 mmap(0x7e0bb2da0000, 20480, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xf000) = 0x7e0bb2da0000
+40870 mmap(0x7e0bb2da5000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x13000) = 0x7e0bb2da5000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb2da5000, 4096, PROT_READ) = 0
+40870 epoll_create1(EPOLL_CLOEXEC)      = 3
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/ssl.py", {st_mode=S_IFREG|0644, st_size=52715, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/ssl.py", {st_mode=S_IFREG|0644, st_size=52715, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/ssl.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=65938, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\353\315\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\21\0\0"..., 65939) = 65938
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 mmap(NULL, 417792, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb2d2b000
+40870 munmap(0x7e0bb2fcd000, 208896)    = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_ssl.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=692368, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_ssl.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=692368, ...}) = 0
+40870 mmap(NULL, 246256, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2cee000
+40870 mmap(0x7e0bb2d01000, 65536, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x13000) = 0x7e0bb2d01000
+40870 mmap(0x7e0bb2d11000, 61440, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x23000) = 0x7e0bb2d11000
+40870 mmap(0x7e0bb2d20000, 45056, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x31000) = 0x7e0bb2d20000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/libssl.so.3", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=47439, ...}) = 0
+40870 mmap(NULL, 47439, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7e0bb2ff4000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libssl.so.3", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1093800, ...}) = 0
+40870 mmap(NULL, 1095656, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2be2000
+40870 mmap(0x7e0bb2c03000, 729088, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x21000) = 0x7e0bb2c03000
+40870 mmap(0x7e0bb2cb5000, 176128, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xd3000) = 0x7e0bb2cb5000
+40870 mmap(0x7e0bb2ce0000, 57344, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xfd000) = 0x7e0bb2ce0000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/libcrypto.so.3", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libcrypto.so.3", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=6111160, ...}) = 0
+40870 mmap(NULL, 6121456, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2600000
+40870 mmap(0x7e0bb26c6000, 3780608, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xc6000) = 0x7e0bb26c6000
+40870 mmap(0x7e0bb2a61000, 1089536, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x461000) = 0x7e0bb2a61000
+40870 mmap(0x7e0bb2b6b000, 430080, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x56b000) = 0x7e0bb2b6b000
+40870 mmap(0x7e0bb2bd4000, 10224, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7e0bb2bd4000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libz.so.1", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=121272, ...}) = 0
+40870 mmap(NULL, 118936, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2fd6000
+40870 mmap(0x7e0bb2fd9000, 77824, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3000) = 0x7e0bb2fd9000
+40870 mmap(0x7e0bb2fec000, 24576, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x16000) = 0x7e0bb2fec000
+40870 mmap(0x7e0bb2ff2000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1c000) = 0x7e0bb2ff2000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libzstd.so.1", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=985240, ...}) = 0
+40870 mmap(NULL, 983104, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb250f000
+40870 mmap(0x7e0bb2513000, 909312, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x4000) = 0x7e0bb2513000
+40870 mmap(0x7e0bb25f1000, 53248, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xe2000) = 0x7e0bb25f1000
+40870 mmap(0x7e0bb25fe000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xef000) = 0x7e0bb25fe000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb25fe000, 4096, PROT_READ) = 0
+40870 mprotect(0x7e0bb2ff2000, 4096, PROT_READ) = 0
+40870 mprotect(0x7e0bb2b6b000, 417792, PROT_READ) = 0
+40870 mprotect(0x7e0bb2ce0000, 40960, PROT_READ) = 0
+40870 mprotect(0x7e0bb2d20000, 4096, PROT_READ) = 0
+40870 munmap(0x7e0bb2ff4000, 47439)     = 0
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb240f000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/base64.py", {st_mode=S_IFREG|0644, st_size=22029, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/base64.py", {st_mode=S_IFREG|0644, st_size=22029, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/base64.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=26650, ...}) = 0
+40870 brk(0x56e68e129000)               = 0x56e68e129000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\rV\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\10\0\0"..., 26651) = 26650
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/struct.py", {st_mode=S_IFREG|0644, st_size=285, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/struct.py", {st_mode=S_IFREG|0644, st_size=285, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/struct.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=367, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\35\1\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 368) = 367
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_struct.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=224056, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_struct.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=224056, ...}) = 0
+40870 mmap(NULL, 57336, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2401000
+40870 mmap(0x7e0bb2404000, 24576, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3000) = 0x7e0bb2404000
+40870 mmap(0x7e0bb240a000, 12288, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x9000) = 0x7e0bb240a000
+40870 mmap(0x7e0bb240d000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xc000) = 0x7e0bb240d000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb240d000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/binascii.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=186952, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/binascii.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=186952, ...}) = 0
+40870 mmap(NULL, 34344, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2ff7000
+40870 mmap(0x7e0bb2ff9000, 12288, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7e0bb2ff9000
+40870 mmap(0x7e0bb2ffc000, 8192, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x5000) = 0x7e0bb2ffc000
+40870 mmap(0x7e0bb2ffe000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x6000) = 0x7e0bb2ffe000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb2ffe000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/constants.py", {st_mode=S_IFREG|0644, st_size=1413, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/constants.py", {st_mode=S_IFREG|0644, st_size=1413, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/constants.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1031, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\205\5\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 1032) = 1031
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/coroutines.py", {st_mode=S_IFREG|0644, st_size=3657, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/coroutines.py", {st_mode=S_IFREG|0644, st_size=3657, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/coroutines.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4511, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViI\16\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 4512) = 4511
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/events.py", {st_mode=S_IFREG|0644, st_size=29531, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/events.py", {st_mode=S_IFREG|0644, st_size=29531, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/events.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=37797, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi[s\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 37798) = 37797
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/contextvars.py", {st_mode=S_IFREG|0644, st_size=198, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/contextvars.py", {st_mode=S_IFREG|0644, st_size=198, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/contextvars.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=427, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\306\0\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\3\0\0"..., 428) = 427
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/format_helpers.py", {st_mode=S_IFREG|0644, st_size=2727, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/format_helpers.py", {st_mode=S_IFREG|0644, st_size=2727, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/format_helpers.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4372, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\247\n\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 4373) = 4372
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_asyncio.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=461920, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload/_asyncio.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=461920, ...}) = 0
+40870 mmap(NULL, 84016, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb23ec000
+40870 mmap(0x7e0bb23f0000, 36864, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x4000) = 0x7e0bb23f0000
+40870 mmap(0x7e0bb23f9000, 20480, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xd000) = 0x7e0bb23f9000
+40870 mmap(0x7e0bb23fe000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x11000) = 0x7e0bb23fe000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb23fe000, 4096, PROT_READ) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_futures.py", {st_mode=S_IFREG|0644, st_size=1974, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_futures.py", {st_mode=S_IFREG|0644, st_size=1974, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/base_futures.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=3276, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\266\7\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 3277) = 3276
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/exceptions.py", {st_mode=S_IFREG|0644, st_size=1752, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/exceptions.py", {st_mode=S_IFREG|0644, st_size=1752, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/exceptions.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=3305, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\330\6\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 3306) = 3305
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_tasks.py", {st_mode=S_IFREG|0644, st_size=2672, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_tasks.py", {st_mode=S_IFREG|0644, st_size=2672, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/base_tasks.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4246, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vip\n\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 4247) = 4246
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/futures.py", {st_mode=S_IFREG|0644, st_size=16824, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/futures.py", {st_mode=S_IFREG|0644, st_size=16824, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/futures.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=19142, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\270A\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 19143) = 19142
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/protocols.py", {st_mode=S_IFREG|0644, st_size=6957, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/protocols.py", {st_mode=S_IFREG|0644, st_size=6957, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/protocols.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=8597, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi-\33\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 8598) = 8597
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/sslproto.py", {st_mode=S_IFREG|0644, st_size=31869, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/sslproto.py", {st_mode=S_IFREG|0644, st_size=31869, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/sslproto.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=42621, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68e14d000)               = 0x56e68e14d000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi}|\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 42622) = 42621
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/transports.py", {st_mode=S_IFREG|0644, st_size=10808, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/transports.py", {st_mode=S_IFREG|0644, st_size=10808, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/transports.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=14032, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi8*\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 14033) = 14032
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/log.py", {st_mode=S_IFREG|0644, st_size=124, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/log.py", {st_mode=S_IFREG|0644, st_size=124, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/log.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=316, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi|\0\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\3\0\0"..., 317) = 316
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/staggered.py", {st_mode=S_IFREG|0644, st_size=7352, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/staggered.py", {st_mode=S_IFREG|0644, st_size=7352, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/staggered.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=7226, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\270\34\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 7227) = 7226
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/locks.py", {st_mode=S_IFREG|0644, st_size=20574, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/locks.py", {st_mode=S_IFREG|0644, st_size=20574, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/locks.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=28810, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi^P\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 28811) = 28810
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/mixins.py", {st_mode=S_IFREG|0644, st_size=481, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/mixins.py", {st_mode=S_IFREG|0644, st_size=481, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/mixins.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1205, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\341\1\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 1206) = 1205
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/tasks.py", {st_mode=S_IFREG|0644, st_size=40458, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/tasks.py", {st_mode=S_IFREG|0644, st_size=40458, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/tasks.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=45760, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\n\236\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 45761) = 45760
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/queues.py", {st_mode=S_IFREG|0644, st_size=10152, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/queues.py", {st_mode=S_IFREG|0644, st_size=10152, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/queues.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=14798, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\250'\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 14799) = 14798
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/timeouts.py", {st_mode=S_IFREG|0644, st_size=5981, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/timeouts.py", {st_mode=S_IFREG|0644, st_size=5981, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/timeouts.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=10404, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi]\27\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 10405) = 10404
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/trsock.py", {st_mode=S_IFREG|0644, st_size=2475, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/trsock.py", {st_mode=S_IFREG|0644, st_size=2475, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/trsock.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=5451, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\253\t\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 5452) = 5451
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/graph.py", {st_mode=S_IFREG|0644, st_size=8674, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/graph.py", {st_mode=S_IFREG|0644, st_size=8674, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/graph.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=11353, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\342!\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\7\0\0"..., 11354) = 11353
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/runners.py", {st_mode=S_IFREG|0644, st_size=7487, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/runners.py", {st_mode=S_IFREG|0644, st_size=7487, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/runners.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=10703, ...}) = 0
+40870 brk(0x56e68e182000)               = 0x56e68e182000
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi?\35\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 10704) = 10703
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/streams.py", {st_mode=S_IFREG|0644, st_size=28481, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/streams.py", {st_mode=S_IFREG|0644, st_size=28481, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/streams.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=34857, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViAo\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 34858) = 34857
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/subprocess.py", {st_mode=S_IFREG|0644, st_size=7737, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/subprocess.py", {st_mode=S_IFREG|0644, st_size=7737, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/subprocess.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=12607, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi9\36\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\10\0\0"..., 12608) = 12607
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb22ec000
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/taskgroups.py", {st_mode=S_IFREG|0644, st_size=10070, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/taskgroups.py", {st_mode=S_IFREG|0644, st_size=10070, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/taskgroups.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=9746, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212ViV'\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\4\0\0"..., 9747) = 9746
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/threads.py", {st_mode=S_IFREG|0644, st_size=790, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/threads.py", {st_mode=S_IFREG|0644, st_size=790, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/threads.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=1271, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\26\3\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 1272) = 1271
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/unix_events.py", {st_mode=S_IFREG|0644, st_size=35520, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/unix_events.py", {st_mode=S_IFREG|0644, st_size=35520, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/unix_events.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=48099, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\300\212\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 48100) = 48099
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_subprocess.py", {st_mode=S_IFREG|0644, st_size=10339, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/base_subprocess.py", {st_mode=S_IFREG|0644, st_size=10339, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/base_subprocess.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=18166, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vic(\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 18167) = 18166
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/selector_events.py", {st_mode=S_IFREG|0644, st_size=48623, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/selector_events.py", {st_mode=S_IFREG|0644, st_size=48623, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/__pycache__/selector_events.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=66605, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vi\357\275\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\6\0\0"..., 66606) = 66605
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/lib-dynload", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/.venv314/lib/python3.14/site-packages", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__init__.cpython-314-x86_64-linux-gnu.so", 0x7ffd7e807080, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__init__.abi3.so", 0x7ffd7e807080, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__init__.so", 0x7ffd7e807080, 0) = -1 ENOENT (No such file or directory)
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__init__.py", {st_mode=S_IFREG|0644, st_size=2047, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__init__.py", {st_mode=S_IFREG|0644, st_size=2047, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__pycache__/__init__.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=2324, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\316\261Vi\377\7\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0"..., 2325) = 2324
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+40870 fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+40870 getdents64(3, 0x56e68e148f20 /* 15 entries */, 32768) = 544
+40870 getdents64(3, 0x56e68e148f20 /* 0 entries */, 32768) = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/_core.cpython-314-x86_64-linux-gnu.so", {st_mode=S_IFREG|0755, st_size=827104, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/_core.cpython-314-x86_64-linux-gnu.so", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0755, st_size=827104, ...}) = 0
+40870 mmap(NULL, 698368, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2241000
+40870 mmap(0x7e0bb2269000, 491520, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x27000) = 0x7e0bb2269000
+40870 mmap(0x7e0bb22e1000, 28672, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x9e000) = 0x7e0bb22e1000
+40870 mmap(0x7e0bb22e8000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xa4000) = 0x7e0bb22e8000
+40870 mmap(0x7e0bb22ea000, 6144, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7e0bb22ea000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=47439, ...}) = 0
+40870 mmap(NULL, 47439, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7e0bb2235000
+40870 close(3)                          = 0
+40870 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+40870 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 832) = 832
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=178928, ...}) = 0
+40870 mmap(NULL, 181160, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7e0bb2208000
+40870 mmap(0x7e0bb220c000, 143360, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x4000) = 0x7e0bb220c000
+40870 mmap(0x7e0bb222f000, 16384, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x27000) = 0x7e0bb222f000
+40870 mmap(0x7e0bb2233000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2a000) = 0x7e0bb2233000
+40870 close(3)                          = 0
+40870 mprotect(0x7e0bb2233000, 4096, PROT_READ) = 0
+40870 mprotect(0x7e0bb22e1000, 28672, PROT_READ) = 0
+40870 munmap(0x7e0bb2235000, 47439)     = 0
+40870 getrandom("\xc0\x39\xf7\x6b\xa1\x5e\x77\x9c\x05\xac\x62\x6e\x0c\x35\x06\x48", 16, GRND_INSECURE) = 16
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/loop.py", {st_mode=S_IFREG|0644, st_size=48138, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/loop.py", {st_mode=S_IFREG|0644, st_size=48138, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__pycache__/loop.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=61235, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\267\242Wi\n\274\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 61236) = 61235
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/typing.py", {st_mode=S_IFREG|0644, st_size=135280, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/typing.py", {st_mode=S_IFREG|0644, st_size=135280, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/__pycache__/typing.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=169301, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 brk(0x56e68e1bb000)               = 0x56e68e1bb000
+40870 read(3, "+\16\r\n\0\0\0\0\317\212Vip\20\2\0\343\0\0\0\0\0\0\0\0\0\0\0\0\r\0\0"..., 169302) = 169301
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/subprocess.py", {st_mode=S_IFREG|0644, st_size=10576, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/subprocess.py", {st_mode=S_IFREG|0644, st_size=10576, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__pycache__/subprocess.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=20737, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0P\242WiP)\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 20738) = 20737
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/policy.py", {st_mode=S_IFREG|0644, st_size=2523, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/policy.py", {st_mode=S_IFREG|0644, st_size=2523, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__pycache__/policy.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=4489, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\232\272Vi\333\t\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 4490) = 4489
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/transport.py", {st_mode=S_IFREG|0644, st_size=9047, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/transport.py", {st_mode=S_IFREG|0644, st_size=9047, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__pycache__/transport.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=13886, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0\343\236WiW#\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 13887) = 13886
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/server.py", {st_mode=S_IFREG|0644, st_size=2999, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/server.py", {st_mode=S_IFREG|0644, st_size=2999, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__pycache__/server.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=5743, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0+\240Vi\267\v\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 5744) = 5743
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore", {st_mode=S_IFDIR|0755, st_size=4096, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/metrics.py", {st_mode=S_IFREG|0644, st_size=5342, ...}, 0) = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/metrics.py", {st_mode=S_IFREG|0644, st_size=5342, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/__pycache__/metrics.cpython-314.pyc", O_RDONLY|O_CLOEXEC) = 3
+40870 fstat(3, {st_mode=S_IFREG|0644, st_size=8055, ...}) = 0
+40870 lseek(3, 0, SEEK_CUR)             = 0
+40870 read(3, "+\16\r\n\0\0\0\0!\240Vi\336\24\0\0\343\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0"..., 8056) = 8055
+40870 read(3, "", 1)                    = 0
+40870 close(3)                          = 0
+40870 io_uring_setup(4096, {flags=IORING_SETUP_SQPOLL|IORING_SETUP_CQSIZE, sq_thread_cpu=0, sq_thread_idle=1000, sq_entries=4096, cq_entries=8192, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=131136, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 3
+40870 mmap(NULL, 262144, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_POPULATE, 3, 0x10000000) = 0x7e0bb21c8000
+40870 mmap(NULL, 147520, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_POPULATE, 3, 0) = 0x7e0bb21a3000
+40870 eventfd2(0, EFD_CLOEXEC|EFD_NONBLOCK) = 4
+40870 io_uring_register(3, IORING_REGISTER_EVENTFD, [4], 1) = 0
+40870 getpid()                          = 40870
+40870 mmap(NULL, 8388608, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0) = 0x7e0bb19a3000
+40870 mlock(0x7e0bb19a3000, 8388608)    = 0
+40870 io_uring_register(3, IORING_REGISTER_BUFFERS, [{iov_base=0x7e0bb19a3000, iov_len=32768}, {iov_base=0x7e0bb19ab000, iov_len=32768}, {iov_base=0x7e0bb19b3000, iov_len=32768}, {iov_base=0x7e0bb19bb000, iov_len=32768}, {iov_base=0x7e0bb19c3000, iov_len=32768}, {iov_base=0x7e0bb19cb000, iov_len=32768}, {iov_base=0x7e0bb19d3000, iov_len=32768}, {iov_base=0x7e0bb19db000, iov_len=32768}, {iov_base=0x7e0bb19e3000, iov_len=32768}, {iov_base=0x7e0bb19eb000, iov_len=32768}, {iov_base=0x7e0bb19f3000, iov_len=32768}, {iov_base=0x7e0bb19fb000, iov_len=32768}, {iov_base=0x7e0bb1a03000, iov_len=32768}, {iov_base=0x7e0bb1a0b000, iov_len=32768}, {iov_base=0x7e0bb1a13000, iov_len=32768}, {iov_base=0x7e0bb1a1b000, iov_len=32768}, {iov_base=0x7e0bb1a23000, iov_len=32768}, {iov_base=0x7e0bb1a2b000, iov_len=32768}, {iov_base=0x7e0bb1a33000, iov_len=32768}, {iov_base=0x7e0bb1a3b000, iov_len=32768}, {iov_base=0x7e0bb1a43000, iov_len=32768}, {iov_base=0x7e0bb1a4b000, iov_len=32768}, {iov_base=0x7e0bb1a53000, iov_len=32768}, {iov_base=0x7e0bb1a5b000, iov_len=32768}, {iov_base=0x7e0bb1a63000, iov_len=32768}, {iov_base=0x7e0bb1a6b000, iov_len=32768}, {iov_base=0x7e0bb1a73000, iov_len=32768}, {iov_base=0x7e0bb1a7b000, iov_len=32768}, {iov_base=0x7e0bb1a83000, iov_len=32768}, {iov_base=0x7e0bb1a8b000, iov_len=32768}, {iov_base=0x7e0bb1a93000, iov_len=32768}, {iov_base=0x7e0bb1a9b000, iov_len=32768}, ...], 256) = 0
+40870 io_uring_register(3, IORING_REGISTER_PBUF_RING, {ring_addr=0x56e68e17b000, ring_entries=256, bgid=1, flags=0}, 1) = 0
+40870 epoll_create1(EPOLL_CLOEXEC)      = 5
+40870 epoll_ctl(5, EPOLL_CTL_ADD, 4, {events=EPOLLIN, data=0x7e0b00000004}) = 0
+40870 write(1, "FAILED: Timeout should be used i"..., 45) = 45
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests/repro_strace.py", {st_mode=S_IFREG|0644, st_size=978, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/tests/repro_strace.py", O_RDONLY|O_CLOEXEC) = 6
+40870 fstat(6, {st_mode=S_IFREG|0644, st_size=978, ...}) = 0
+40870 lseek(6, 0, SEEK_CUR)             = 0
+40870 read(6, "\nimport asyncio\nimport uringcore"..., 131072) = 978
+40870 read(6, "", 8192)                 = 0
+40870 close(6)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/loop.py", {st_mode=S_IFREG|0644, st_size=48138, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/uringcore/python/uringcore/loop.py", O_RDONLY|O_CLOEXEC) = 6
+40870 fstat(6, {st_mode=S_IFREG|0644, st_size=48138, ...}) = 0
+40870 lseek(6, 0, SEEK_CUR)             = 0
+40870 read(6, "\"\"\"UringEventLoop: Pure io_uring"..., 131072) = 48138
+40870 read(6, "", 8192)                 = 0
+40870 close(6)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/tasks.py", {st_mode=S_IFREG|0644, st_size=40458, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/tasks.py", O_RDONLY|O_CLOEXEC) = 6
+40870 fstat(6, {st_mode=S_IFREG|0644, st_size=40458, ...}) = 0
+40870 lseek(6, 0, SEEK_CUR)             = 0
+40870 read(6, "\"\"\"Support for tasks, coroutines"..., 131072) = 40458
+40870 mmap(NULL, 1048576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7e0bb18a3000
+40870 read(6, "", 8192)                 = 0
+40870 close(6)                          = 0
+40870 newfstatat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/timeouts.py", {st_mode=S_IFREG|0644, st_size=5981, ...}, 0) = 0
+40870 openat(AT_FDCWD, "/home/nkit_umar_andey/.pyenv/versions/3.14.2/lib/python3.14/asyncio/timeouts.py", O_RDONLY|O_CLOEXEC) = 6
+40870 fstat(6, {st_mode=S_IFREG|0644, st_size=5981, ...}) = 0
+40870 lseek(6, 0, SEEK_CUR)             = 0
+40870 read(6, "import enum\n\nfrom types import T"..., 131072) = 5981
+40870 read(6, "", 8192)                 = 0
+40870 close(6)                          = 0
+40870 write(2, "Traceback (most recent call last"..., 35) = 35
+40870 openat(AT_FDCWD, "<unknown>", O_RDONLY) = -1 ENOENT (No such file or directory)
+40870 openat(AT_FDCWD, "<unknown>", O_RDONLY) = -1 ENOENT (No such file or directory)
+40870 write(2, "  File \"/home/nkit_umar_andey/ur"..., 231) = 231
+40870 write(2, "  File \"/home/nkit_umar_andey/ur"..., 153) = 153
+40870 write(2, "  File \"/home/nkit_umar_andey/.p"..., 192) = 192
+40870 write(2, "  File \"/home/nkit_umar_andey/.p"..., 176) = 176
+40870 write(2, "RuntimeError: Timeout should be "..., 51) = 51
+40870 epoll_ctl(5, EPOLL_CTL_DEL, 4, 0x7ffd7e807844) = 0
+40870 close(5)                          = 0
+40870 io_uring_register(3, IORING_UNREGISTER_BUFFERS, NULL, 0) = 0
+40870 io_uring_register(3, IORING_UNREGISTER_PBUF_RING, {ring_addr=NULL, ring_entries=0, bgid=1, flags=0}, 1) = 0
+40870 rt_sigaction(SIGINT, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK, sa_restorer=0x7e0bb32458d0}, {sa_handler=0x7e0bb393eda0, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK, sa_restorer=0x7e0bb32458d0}, 8) = 0
+40870 munmap(0x7e0bb2d2b000, 417792)    = 0
+40870 munmap(0x7e0bb3d87000, 16384)     = 0
+40870 exit_group(0)                     = ?
+40870 +++ exited with 0 +++

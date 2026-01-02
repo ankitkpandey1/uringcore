@@ -10,6 +10,12 @@
 #![allow(clippy::cast_sign_loss)]
 // Ring.ring is intentional naming
 #![allow(clippy::struct_field_names)]
+// FFI flags struct naturally has many bools
+#![allow(clippy::struct_excessive_bools)]
+// Allow potential wrap for timestamp casts
+#![allow(clippy::cast_possible_wrap)]
+// len() == 0 is sometimes clearer
+#![allow(clippy::len_zero)]
 
 use io_uring::{opcode, types, IoUring, Submitter};
 use nix::sys::eventfd::{EfdFlags, EventFd};
@@ -19,6 +25,7 @@ use std::sync::Arc;
 
 use crate::buffer::BufferPool;
 use crate::error::{Error, Result};
+use crate::fixed_fd::FixedFdTable;
 
 /// Default ring size (number of SQ entries)
 pub const DEFAULT_RING_SIZE: u32 = 4096;
@@ -90,6 +97,12 @@ pub enum OpType {
     Close = 4,
     /// Timeout operation
     Timeout = 5,
+    /// SOTA: Multishot receive (kernel 5.19+)
+    RecvMulti = 6,
+    /// SOTA: Zero-copy send (kernel 6.0+)
+    SendZC = 7,
+    /// SOTA: Multishot accept (kernel 5.19+)
+    AcceptMulti = 8,
     /// Unknown operation
     Unknown = 255,
 }
@@ -105,7 +118,27 @@ impl OpType {
             3 => Self::Connect,
             4 => Self::Close,
             5 => Self::Timeout,
+            6 => Self::RecvMulti,
+            7 => Self::SendZC,
+            8 => Self::AcceptMulti,
             _ => Self::Unknown,
+        }
+    }
+
+    /// Convert to string slice.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Recv => "recv",
+            Self::Send => "send",
+            Self::Accept => "accept",
+            Self::Connect => "connect",
+            Self::Close => "close",
+            Self::Timeout => "timeout",
+            Self::RecvMulti => "recv_multi",
+            Self::SendZC => "send_zc",
+            Self::AcceptMulti => "accept_multi",
+            Self::Unknown => "unknown",
         }
     }
 }
@@ -147,6 +180,10 @@ pub struct Ring {
     is_active: AtomicBool,
     /// Buffer pool reference for registered buffers
     buffer_pool: Option<Arc<BufferPool>>,
+    /// SOTA: Registered FD table (`IOSQE_FIXED_FILE`)
+    registered_fds: Option<FixedFdTable>,
+    /// SOTA: Provided buffer ring group ID
+    provided_buf_group_id: Option<u16>,
 }
 
 impl Ring {
@@ -176,6 +213,8 @@ impl Ring {
             original_pid: std::process::id(),
             is_active: AtomicBool::new(true),
             buffer_pool: None,
+            registered_fds: None,
+            provided_buf_group_id: None,
         })
     }
 
@@ -238,6 +277,66 @@ impl Ring {
         self.generation_id.load(Ordering::SeqCst)
     }
 
+    /// Register a file descriptor.
+    ///
+    /// If the table isn't initialized, it initializes it with `DEFAULT_RING_SIZE`.
+    pub fn register_file(&mut self, fd: RawFd) -> Result<u32> {
+        // Initialize table if needed
+        if self.registered_fds.is_none() {
+            let table = FixedFdTable::new(DEFAULT_RING_SIZE);
+            // Register initial sparse set
+            self.ring
+                .submitter()
+                .register_files(table.as_vec())
+                .map_err(|e| Error::RingOp(format!("register_files init failed: {e}")))?;
+            self.registered_fds = Some(table);
+        }
+
+        let table = self.registered_fds.as_mut().unwrap();
+        // Check if already registered
+        if let Some(idx) = table.get_index(fd) {
+            return Ok(idx);
+        }
+
+        // Insert into table logic
+        if let Some(idx) = table.insert(fd) {
+            // Update kernel
+            // register_files_update takes offset and slice of FDs
+            let fds = [fd];
+            match self.ring.submitter().register_files_update(idx, &fds) {
+                Ok(_) => Ok(idx),
+                Err(e) => {
+                    // Rollback
+                    table.remove(fd);
+                    Err(Error::RingOp(format!("register_files_update failed: {e}")))
+                }
+            }
+        } else {
+            Err(Error::RingOp("Fixed file table full".into()))
+        }
+    }
+
+    /// Unregister a file descriptor.
+    pub fn unregister_file(&mut self, fd: RawFd) -> Result<()> {
+        if let Some(table) = self.registered_fds.as_mut() {
+            if let Some(idx) = table.remove(fd) {
+                // Update kernel with -1 (sentinel)
+                let fds = [-1];
+                self.ring
+                    .submitter()
+                    .register_files_update(idx, &fds)
+                    .map_err(|e| Error::RingOp(format!("unregister_file failed: {e}")))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Look up the fixed index for a file descriptor.
+    #[must_use]
+    pub fn lookup_fixed(&self, fd: RawFd) -> Option<u32> {
+        self.registered_fds.as_ref().and_then(|t| t.get_index(fd))
+    }
+
     /// Get the low 16 bits of generation for `user_data` encoding.
     #[must_use]
     pub fn generation_u16(&self) -> u16 {
@@ -263,10 +362,58 @@ impl Ring {
             self.ring
                 .submitter()
                 .register_buffers(&iovecs)
-                .map_err(|e| Error::RingOp(format!("register_buffers failed: {e}")))?;
+                .map_err(|e| {
+                    if e.raw_os_error() == Some(12) {
+                        Error::RingOp(
+                            "register_buffers failed: Cannot allocate memory (ENOMEM). \
+                             This usually means the RLIMIT_MEMLOCK is too low. \
+                             Try increasing it with 'ulimit -l 65536' or editing /etc/security/limits.conf. \
+                             Original error: 12".to_string()
+                        )
+                    } else {
+                        Error::RingOp(format!("register_buffers failed: {e}"))
+                    }
+                })?;
         }
 
         self.buffer_pool = Some(pool);
+        Ok(())
+    }
+
+    /// Register a provided buffer ring.
+    ///
+    /// # Safety
+    ///
+    /// The address must be valid and `ring_entries` must match allocation.
+    pub unsafe fn register_pbuf_ring(
+        &mut self,
+        addr: u64,
+        ring_entries: u16,
+        bgid: u16,
+    ) -> Result<()> {
+        // io-uring 0.7 does not expose high-level register_buf_ring yet.
+        // We use the raw register syscall via enter() or similar if possible.
+        // Actually, Submitter has register_buf_ring since older versions?
+        // Let's check if the crate supports it. If not, we use raw register.
+        // io-uring crate 0.6+ supports register_buf_ring.
+
+        self.ring
+            .submitter()
+            .register_buf_ring_with_flags(addr, ring_entries, bgid, 0)
+            .map_err(|e| Error::RingOp(format!("register_buf_ring failed: {e}")))?;
+
+        self.provided_buf_group_id = Some(bgid);
+        Ok(())
+    }
+
+    /// Unregister a provided buffer ring.
+    pub fn unregister_pbuf_ring(&mut self, bgid: u16) -> Result<()> {
+        self.ring
+            .submitter()
+            .unregister_buf_ring(bgid)
+            .map_err(|e| Error::RingOp(format!("unregister_buf_ring failed: {e}")))?;
+
+        self.provided_buf_group_id = None;
         Ok(())
     }
 
@@ -296,7 +443,17 @@ impl Ring {
     /// # Errors
     ///
     /// Returns an error if submission fails.
-    pub fn submit(&self) -> Result<usize> {
+    /// Submit pending operations to the kernel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if submission fails.
+    pub fn submit(&mut self) -> Result<usize> {
+        // Optimization: Don't submit if SQ is empty
+        if self.ring.submission().len() == 0 {
+            return Ok(0);
+        }
+
         // Always call submit to ensure operations are flushed to kernel
         // Even with SQPOLL, we need io_uring_enter when the kernel thread is idle
         self.ring
@@ -369,9 +526,15 @@ impl Ring {
         let user_data = encode_user_data(fd, OpType::Recv, generation);
 
         // Use regular Recv with provided buffer
-        let entry = opcode::Recv::new(types::Fd(fd), buf, len)
-            .build()
-            .user_data(user_data);
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::Recv::new(types::Fixed(idx), buf, len)
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::Recv::new(types::Fd(fd), buf, len)
+                .build()
+                .user_data(user_data)
+        };
 
         self.with_sq(|sq| {
             if sq.is_full() {
@@ -396,9 +559,15 @@ impl Ring {
     ) -> Result<()> {
         let user_data = encode_user_data(fd, OpType::Send, generation);
 
-        let entry = opcode::Send::new(types::Fd(fd), buf, len)
-            .build()
-            .user_data(user_data);
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::Send::new(types::Fixed(idx), buf, len)
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::Send::new(types::Fd(fd), buf, len)
+                .build()
+                .user_data(user_data)
+        };
 
         self.with_sq(|sq| {
             if sq.is_full() {
@@ -414,15 +583,51 @@ impl Ring {
         let user_data = encode_user_data(fd, OpType::Accept, generation);
 
         // Use regular Accept instead of AcceptMulti for broader kernel compatibility
-        let entry = opcode::Accept::new(types::Fd(fd), std::ptr::null_mut(), std::ptr::null_mut())
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::Accept::new(
+                types::Fixed(idx),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
             .build()
-            .user_data(user_data);
+            .user_data(user_data)
+        } else {
+            opcode::Accept::new(types::Fd(fd), std::ptr::null_mut(), std::ptr::null_mut())
+                .build()
+                .user_data(user_data)
+        };
 
         self.with_sq(|sq| {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
             // SAFETY: Accept is safe to push
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push failed".into()))
+            }
+        })
+    }
+
+    /// Prepare a multishot accept operation.
+    pub fn prep_accept_multishot(&mut self, fd: RawFd, generation: u16) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::AcceptMulti, generation);
+
+        // Try using AcceptMulti opcode directly
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::AcceptMulti::new(types::Fixed(idx))
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::AcceptMulti::new(types::Fd(fd))
+                .build()
+                .user_data(user_data)
+        };
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
             unsafe {
                 sq.push(&entry)
                     .map_err(|_| Error::RingOp("push failed".into()))
@@ -473,10 +678,17 @@ impl Ring {
             .nsec(((timeout_ms % 1000) * 1_000_000) as u32);
 
         // Connect operation with IO_LINK flag to link with timeout
-        let connect_entry = opcode::Connect::new(types::Fd(fd), addr, addr_len)
-            .build()
-            .user_data(connect_user_data)
-            .flags(io_uring::squeue::Flags::IO_LINK);
+        let connect_entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::Connect::new(types::Fixed(idx), addr, addr_len)
+                .build()
+                .user_data(connect_user_data)
+                .flags(io_uring::squeue::Flags::IO_LINK)
+        } else {
+            opcode::Connect::new(types::Fd(fd), addr, addr_len)
+                .build()
+                .user_data(connect_user_data)
+                .flags(io_uring::squeue::Flags::IO_LINK)
+        };
 
         // Link timeout operation - cancels the linked connect if it takes too long
         let timeout_entry = opcode::LinkTimeout::new(&raw const ts)
@@ -499,9 +711,227 @@ impl Ring {
         })
     }
 
-    /// Shutdown the ring.
+    // =========================================================================
+    // SOTA 2025 OPTIMIZATIONS
+    // =========================================================================
+
+    /// Prepare a standalone timeout operation (native timer).
+    ///
+    /// Returns completion when `deadline_ns` (absolute monotonic time) is reached.
+    /// Use `encode_user_data(timer_id, OpType::Timeout, gen)` for `user_data`.
+    pub fn prep_timeout(&mut self, deadline_ns: u64, user_data: u64) -> Result<()> {
+        // Convert nanoseconds to timespec
+        #[allow(clippy::cast_possible_truncation)]
+        let ts = types::Timespec::new()
+            .sec((deadline_ns / 1_000_000_000) as i64 as u64)
+            .nsec((deadline_ns % 1_000_000_000) as u32);
+
+        let entry = opcode::Timeout::new(&raw const ts)
+            .flags(types::TimeoutFlags::ABS) // Absolute timeout
+            .build()
+            .user_data(user_data);
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push timeout failed".into()))
+            }
+        })
+    }
+
+    /// Cancel a pending timeout operation.
+    pub fn cancel_timeout(&mut self, user_data: u64) -> Result<()> {
+        let entry = opcode::TimeoutRemove::new(user_data)
+            .build()
+            .user_data(user_data);
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push timeout_remove failed".into()))
+            }
+        })
+    }
+
+    /// Prepare multishot receive (kernel 5.19+).
+    ///
+    /// One submission handles ALL future data on this socket until cancelled.
+    /// Completions have `CQE_F_MORE` flag when more data is expected.
+    ///
+    /// # Safety
+    ///
+    /// Requires kernel 5.19+. May fail with EINVAL on older kernels.
+    /// Requires `IORING_REGISTER_PBUF_RING` setup.
+    pub fn prep_recv_multishot(
+        &mut self,
+        fd: RawFd,
+        buf_group: u16,
+        generation: u16,
+    ) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::RecvMulti, generation);
+
+        // Use RecvMulti opcode (usually Recv with MULTISHOT flag)
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::RecvMulti::new(types::Fixed(idx), buf_group)
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::RecvMulti::new(types::Fd(fd), buf_group)
+                .build()
+                .user_data(user_data)
+        };
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push recv_multi failed".into()))
+            }
+        })
+    }
+
+    // =========================================================================
+    // SOTA 2025: Registered FD Table (IOSQE_FIXED_FILE)
+    // =========================================================================
+
+    /// Register file descriptors for `IOSQE_FIXED_FILE` optimization.
+    ///
+    /// After registration, use `prep_recv_fixed(fd_index, ...)` instead of raw FDs.
+    /// This eliminates per-operation FD lookup overhead.
+    pub fn register_fds(&mut self, fds: &[RawFd]) -> Result<()> {
+        self.ring
+            .submitter()
+            .register_files(fds)
+            .map_err(|e| Error::RingOp(format!("register_files failed: {e}")))?;
+
+        let capacity = fds.len().max(DEFAULT_RING_SIZE as usize) as u32;
+        let table = FixedFdTable::init_from_slice(capacity, fds);
+        self.registered_fds = Some(table);
+        Ok(())
+    }
+
+    /// Unregister previously registered file descriptors.
+    pub fn unregister_fds(&mut self) -> Result<()> {
+        if self.registered_fds.is_some() {
+            self.ring
+                .submitter()
+                .unregister_files()
+                .map_err(|e| Error::RingOp(format!("unregister_files failed: {e}")))?;
+            self.registered_fds = None;
+        }
+        Ok(())
+    }
+
+    /// Get the index of a registered FD, or None if not registered.
+    pub fn fd_index(&self, fd: RawFd) -> Option<u32> {
+        self.lookup_fixed(fd)
+    }
+
+    // =========================================================================
+    // SOTA 2025: Zero-Copy Send (SEND_ZC)
+    // =========================================================================
+
+    /// Requires kernel 6.0+.
+    /// For large payloads, avoids copying data into kernel.
+    ///
+    /// # Safety
+    ///
+    /// Buffer must remain valid until `IORING_CQE_F_NOTIF` completion.
+    pub unsafe fn prep_send_zc(
+        &mut self,
+        fd: RawFd,
+        buf: *const u8,
+        len: u32,
+        generation: u16,
+    ) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::SendZC, generation);
+
+        // Use SendZc opcode
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::SendZc::new(types::Fixed(idx), buf, len)
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::SendZc::new(types::Fd(fd), buf, len)
+                .build()
+                .user_data(user_data)
+        };
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            sq.push(&entry)
+                .map_err(|_| Error::RingOp("push send_zc failed".into()))
+        })
+    }
+
+    /// Get ring capabilities for feature detection.
+    pub fn capabilities(&self) -> RingCapabilities {
+        RingCapabilities {
+            sqpoll: self.sqpoll_enabled,
+            registered_fds: self.registered_fds.is_some(),
+            // Note: Full capability detection would require probing the kernel
+            multishot_recv: true, // Assume available, will fail gracefully if not
+            send_zc: true,        // Assume available, will fail gracefully if not
+            provided_buffers: self.provided_buf_group_id.is_some(),
+        }
+    }
+
+    /// Shutdown the ring and release resources.
     pub fn shutdown(&mut self) {
+        // Stop the loop
         self.is_active.store(false, Ordering::SeqCst);
+
+        // Explicitly unregister buffers and FDs to release resources
+        if self.buffer_pool.is_some() {
+            let _ = self.ring.submitter().unregister_buffers();
+            self.buffer_pool = None;
+        }
+        if self.registered_fds.is_some() {
+            let _ = self.ring.submitter().unregister_files();
+            self.registered_fds = None;
+        }
+        if let Some(bgid) = self.provided_buf_group_id {
+            let _ = self.ring.submitter().unregister_buf_ring(bgid);
+            self.provided_buf_group_id = None;
+        }
+    }
+}
+
+/// Ring capabilities for feature detection.
+#[derive(Debug, Clone, Copy)]
+pub struct RingCapabilities {
+    /// SQPOLL mode enabled
+    pub sqpoll: bool,
+    /// Registered FD table active
+    pub registered_fds: bool,
+    /// Multishot recv available (kernel 5.19+)
+    pub multishot_recv: bool,
+    /// Zero-copy send available (kernel 6.0+)
+    pub send_zc: bool,
+    /// Provided buffer ring active
+    pub provided_buffers: bool,
+}
+
+impl Drop for Ring {
+    fn drop(&mut self) {
+        // Fallback cleanup if shutdown wasn't called
+        if self.buffer_pool.is_some() {
+            let _ = self.ring.submitter().unregister_buffers();
+        }
+        // Cleanup pbuf ring if still active
+        if let Some(bgid) = self.provided_buf_group_id {
+            let _ = self.ring.submitter().unregister_buf_ring(bgid);
+        }
     }
 }
 

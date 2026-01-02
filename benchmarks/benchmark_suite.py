@@ -159,17 +159,144 @@ async def bench_call_soon():
     await future
 
 
+# Additional benchmarks
+
+async def bench_sleep_sequential():
+    """Sequential sleep(0)."""
+    for _ in range(10):
+        await asyncio.sleep(0)
+
+async def bench_sleep_concurrent_100():
+    """100 concurrent sleep(0)."""
+    async def noop():
+        await asyncio.sleep(0)
+    await asyncio.gather(*[noop() for _ in range(100)])
+
+async def bench_semaphore_acquire():
+    """Semaphore acquire/release."""
+    sem = asyncio.Semaphore(1)
+    async with sem:
+        pass
+
+async def bench_condition_notify():
+    """Condition wait/notify."""
+    cond = asyncio.Condition()
+    async def waiter():
+        async with cond:
+            await cond.wait()
+    
+    async def notifier():
+        async with cond:
+            cond.notify()
+            
+    t = asyncio.create_task(waiter())
+    # Ensure waiter is waiting
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    await notifier()
+    await t
+
+async def bench_context_vars():
+    """ContextVar propagation overhead."""
+    import contextvars
+    var = contextvars.ContextVar("bench", default=0)
+    var.set(1)
+    async def get_val():
+        return var.get()
+    await asyncio.create_task(get_val())
+
+async def bench_call_later():
+    """call_later scheduling overhead."""
+    loop = asyncio.get_event_loop()
+    future = loop.create_future()
+    loop.call_later(0.000001, future.set_result, 42)
+    await future
+
+async def bench_cancel_task():
+    """Task cancellation overhead."""
+    async def forever():
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            pass
+    t = asyncio.create_task(forever())
+    await asyncio.sleep(0)
+    t.cancel()
+    await t
+
+async def bench_shield_overhead():
+    """asyncio.shield overhead."""
+    async def noop():
+        pass
+    await asyncio.shield(noop())
+
+async def bench_wait_for_overhead():
+    """asyncio.wait_for overhead."""
+    async def noop():
+        pass
+    await asyncio.wait_for(noop(), timeout=10)
+
+async def bench_deep_recursion():
+    """Deep recursion/stack chain."""
+    async def recursive(n):
+        if n <= 0:
+            return
+        await recursive(n - 1)
+    await recursive(20)
+
+async def bench_exception_overhead():
+    """Exception propagation overhead."""
+    async def raiser():
+        raise ValueError("test")
+    try:
+        await raiser()
+    except ValueError:
+        pass
+
+async def bench_socketpair_overhead():
+    """Socketpair send/recv overhead (simulated networking)."""
+    import socket
+    rsock, wsock = socket.socketpair()
+    rsock.setblocking(False)
+    wsock.setblocking(False)
+    
+    loop = asyncio.get_event_loop()
+    
+    async def sender():
+        await loop.sock_sendall(wsock, b"x")
+        
+    async def receiver():
+        await loop.sock_recv(rsock, 1)
+        
+    await asyncio.gather(sender(), receiver())
+    
+    rsock.close()
+    wsock.close()
+
 # Benchmark configurations: (function, name, iterations)
 BENCHMARKS = [
     (bench_sleep_zero, "sleep(0)", 10000),
     (bench_create_task, "create_task", 5000),
     (bench_gather_10, "gather(10)", 2000),
     (bench_gather_100, "gather(100)", 500),
-    (bench_queue_put_get, "queue_put_get", 5000),
-    (bench_event_set_wait, "event_set_wait", 10000),
+    (bench_queue_put_get, "queue_put", 5000), # Renamed for brevity
+    (bench_event_set_wait, "event_wait", 5000),
     (bench_lock_acquire, "lock_acquire", 10000),
-    (bench_future_result, "future_result", 10000),
+    (bench_future_result, "future_res", 10000),
     (bench_call_soon, "call_soon", 10000),
+    # New benchmarks
+    (bench_sleep_sequential, "sleep_seq_10", 2000),
+    (bench_sleep_concurrent_100, "sleep_conc_100", 200),
+    (bench_semaphore_acquire, "semaphore", 10000),
+    (bench_condition_notify, "condition", 2000),
+    (bench_context_vars, "context_vars", 5000),
+    (bench_call_later, "call_later", 5000),
+    (bench_cancel_task, "task_cancel", 2000),
+    (bench_shield_overhead, "shield", 5000),
+    (bench_wait_for_overhead, "wait_for", 5000),
+    (bench_deep_recursion, "recursion_20", 2000),
+    (bench_exception_overhead, "exception", 10000),
+    (bench_socketpair_overhead, "sock_pair", 2000),
 ]
 
 
@@ -188,6 +315,7 @@ def run_suite_with_loop(loop_type: str, loop_factory: Callable) -> list[Benchmar
             print(f"  {name}: {result.avg_time_us:.2f} µs/op ({result.ops_per_sec:.0f} ops/sec)")
         finally:
             loop.close()
+            gc.collect() # Ensure resources are freed before next loop creation
     
     return results
 
@@ -220,8 +348,12 @@ def run_all_benchmarks() -> dict:
     try:
         from uringcore import UringCore
         
-        # Test if UringCore works
-        core = UringCore()
+        # Check env for override or use safe defaults for testing if tight
+        buffer_count = int(os.environ.get("URINGCORE_BUFFER_COUNT", 512))
+        buffer_size = int(os.environ.get("URINGCORE_BUFFER_SIZE", 32768))
+        
+        # Initialize core (will raise helpful error if ENOMEM)
+        core = UringCore(buffer_count=buffer_count, buffer_size=buffer_size)
         core.shutdown()
         
         print("\n[uringcore] Running benchmarks...")
@@ -229,14 +361,15 @@ def run_all_benchmarks() -> dict:
         # Full event loop benchmarks require transport layer
         
         def uringcore_loop_factory():
-            return asyncio.new_event_loop()
+             from uringcore import new_event_loop
+             return new_event_loop(buffer_count=buffer_count, buffer_size=buffer_size)
         
         results["benchmarks"]["uringcore"] = [
             asdict(r) for r in run_suite_with_loop("uringcore", uringcore_loop_factory)
         ]
         
         # Add uringcore-specific metrics
-        core = UringCore()
+        core = UringCore(buffer_count=buffer_count, buffer_size=buffer_size)
         results["uringcore_info"] = {
             "event_fd": core.event_fd,
             "sqpoll_enabled": core.sqpoll_enabled,
@@ -418,6 +551,115 @@ def generate_charts(results: dict, output_dir: Optional[Path] = None):
         plt.close()
 
 
+# Check for Plotly
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    print("Note: plotly not available, skipping interactive charts")
+
+
+def generate_plotly_charts(results: dict, output_dir: Optional[Path] = None):
+    """Generate interactive charts using Plotly."""
+    if not PLOTLY_AVAILABLE:
+        return
+
+    if output_dir is None:
+        output_dir = Path(__file__).parent / "results"
+
+    benchmarks = results.get("benchmarks", {})
+    if not benchmarks:
+        return
+
+    loops = list(benchmarks.keys())
+    first_loop = loops[0]
+    bench_names = [b["name"] for b in benchmarks[first_loop]]
+    
+    # Define colors
+    colors = {"asyncio": "#3498db", "uvloop": "#2ecc71", "uringcore": "#e74c3c"}
+
+    # Create subplot figure
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=("Operation Latency (lower is better)", "Speedup vs asyncio (higher is better)"),
+        vertical_spacing=0.15
+    )
+
+    # 1. Latency Bar Chart
+    for loop in loops:
+        times = []
+        for b in benchmarks[loop]:
+            times.append(b["avg_time_us"])
+        
+        fig.add_trace(
+            go.Bar(name=loop, x=bench_names, y=times, marker_color=colors.get(loop, "gray")),
+            row=1, col=1
+        )
+
+    # 2. Speedup Chart (if comparison possible)
+    if len(loops) > 1 and "asyncio" in loops:
+        for loop in loops:
+            if loop == "asyncio":
+                continue
+            
+            speedups = []
+            for bench_name in bench_names:
+                asyncio_time = next((b["avg_time_us"] for b in benchmarks["asyncio"] if b["name"] == bench_name), None)
+                loop_time = next((b["avg_time_us"] for b in benchmarks[loop] if b["name"] == bench_name), None)
+                
+                if asyncio_time and loop_time and loop_time > 0:
+                    speedups.append(asyncio_time / loop_time)
+                else:
+                    speedups.append(1.0)
+            
+            fig.add_trace(
+                go.Bar(
+                    name=f"{loop} speedup", 
+                    x=bench_names, 
+                    y=speedups, 
+                    marker_color=colors.get(loop, "gray"),
+                    showlegend=True
+                ),
+                row=2, col=1
+            )
+        
+        # Add baseline line
+        fig.add_shape(
+            type="line", line=dict(dash="dash", width=1, color="gray"),
+            x0=-0.5, x1=len(bench_names)-0.5, y0=1, y1=1,
+            row=2, col=1
+        )
+
+    # Update layout
+    fig.update_layout(
+        title_text=f"Event Loop Performance: uringcore vs others ({sys.platform})",
+        height=900,
+        showlegend=True,
+        barmode='group',
+        template="plotly_white"
+    )
+    
+    # Update axes
+    fig.update_yaxes(title_text="Time (µs)", row=1, col=1)
+    fig.update_yaxes(title_text="Speedup Factor (x)", row=2, col=1)
+    fig.update_xaxes(tickangle=45, row=2, col=1)
+
+    # Save to HTML
+    html_path = output_dir / "benchmark_report.html"
+    fig.write_html(str(html_path))
+    print(f"Interactive report saved to {html_path}")
+
+    # Save to PNG (for BENCHMARK.md)
+    try:
+        png_path = output_dir / "benchmark_chart.png"
+        fig.write_image(str(png_path), scale=2)
+        print(f"Static chart saved to {png_path}")
+    except Exception as e:
+        print(f"Failed to save static chart (requires kaleido): {e}")
+
+
 def main():
     """Main entry point."""
     print("=" * 60)
@@ -438,6 +680,7 @@ def main():
     
     # Generate charts
     generate_charts(results, output_dir)
+    generate_plotly_charts(results, output_dir)
     
     print("\nBenchmark complete!")
 

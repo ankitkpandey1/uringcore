@@ -14,7 +14,7 @@ import time
 @dataclass
 class Metrics:
     """Runtime metrics snapshot.
-    
+
     Attributes:
         buffers_total: Total number of buffers in pool
         buffers_free: Available buffers
@@ -26,6 +26,7 @@ class Metrics:
         fd_paused: Number of paused file descriptors
         timestamp: When metrics were captured
     """
+
     buffers_total: int
     buffers_free: int
     buffers_quarantined: int
@@ -97,7 +98,7 @@ class MetricsCollector:
 
     def __init__(self, core):
         """Initialize collector with UringCore instance.
-        
+
         Args:
             core: UringCore instance to collect metrics from
         """
@@ -132,7 +133,7 @@ class MetricsCollector:
 
     def add_callback(self, callback: Callable[[Metrics], None]) -> None:
         """Add callback to be invoked on each metrics collection.
-        
+
         Args:
             callback: Function receiving Metrics instance
         """
@@ -148,16 +149,16 @@ class MetricsCollector:
 
 def get_metrics(loop) -> Optional[Metrics]:
     """Get current metrics from event loop.
-    
+
     Args:
         loop: UringEventLoop instance
-        
+
     Returns:
         Metrics snapshot or None if not a uringcore loop
     """
-    core = getattr(loop, '_core', None)
+    core = getattr(loop, "_core", None)
     if core is None:
         return None
-    
+
     collector = MetricsCollector(core)
     return collector.collect()

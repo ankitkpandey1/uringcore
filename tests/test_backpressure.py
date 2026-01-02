@@ -13,7 +13,7 @@ class TestBackpressure:
 
     def test_buffer_stats_available(self):
         """Verify buffer statistics are accessible."""
-        core = uringcore.UringCore()
+        core = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         stats = core.buffer_stats()
         
         assert len(stats) == 4
@@ -27,7 +27,7 @@ class TestBackpressure:
 
     def test_fd_stats_available(self):
         """Verify FD statistics are accessible."""
-        core = uringcore.UringCore()
+        core = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         stats = core.fd_stats()
         
         assert len(stats) == 4
@@ -37,7 +37,7 @@ class TestBackpressure:
 
     def test_metrics_integration(self):
         """Test metrics module integration."""
-        core = uringcore.UringCore()
+        core = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         
         # Get buffer stats directly
         stats = core.buffer_stats()
@@ -50,7 +50,7 @@ class TestBackpressure:
 
     def test_generation_id_positive(self):
         """Test generation ID is available and positive."""
-        core = uringcore.UringCore()
+        core = uringcore.UringCore(buffer_count=16, buffer_size=4096)
         gen_id = core.generation_id
         
         assert isinstance(gen_id, int)

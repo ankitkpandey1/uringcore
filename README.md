@@ -7,6 +7,39 @@
 
 A high-performance asyncio event loop for Linux using io_uring.
 
+## Project Status
+**Current Phase:** Phase 15 (Final Polish & Release)
+
+`uringcore` is a high-performance, drop-in replacement for `asyncio` on Linux.
+It passes **all tests** including proper stress testing and FastAPI/Starlette E2E tests, and outperforms `uvloop` in single-task latency benchmarks.
+
+
+## Key Features
+- **Pure io_uring**: No `epoll`/`selector` fallback. All I/O is submitted to the ring.
+- **Lock-Free Scheduler**: MPSC channel using `crossbeam-channel` for high-concurrency task scheduling.
+- **Zero-Copy Buffers**: Pre-registered fixed buffers for maximum I/O bandwidth.
+- **Native Futures**: Optimized Future implementation entirely in Rust.
+- **Asyncio Function Caching**: Cached `_enter_task`/`_leave_task` to reduce per-step overhead.
+- **Registered FD Table**: `IOSQE_FIXED_FILE` support for zero FD lookup overhead.
+- **Zero-Copy Send**: `IORING_OP_SEND_ZC` for large payload efficiency (kernel 6.0+).
+- **Multishot Recv**: `RECV_MULTISHOT` for persistent connections (kernel 5.19+).
+- **Native Timers**: `IORING_OP_TIMEOUT` for zero-syscall timer management.
+- **Strict Resource Management**: Deterministic cleanup via `Drop` trait.
+
+## Benchmarks
+Latest results (Jan 2026) vs `uvloop`:
+
+**Single-Task Latency (uringcore wins):**
+- `sleep(0)`: **2.9x faster** (4.26µs vs 12.53µs)
+- `lock_acquire`: **3.1x faster** (3.90µs vs 12.26µs)
+- `future_res`: **3.3x faster** (3.91µs vs 12.81µs)
+
+**High-Concurrency (uvloop wins):**
+- `gather(100)`: 2.7x slower (314µs vs 114µs)
+- `sleep_conc_100`: 2.5x slower (410µs vs 165µs)
+
+*Gap due to PyO3 call overhead in task stepping. See [ARCHITECTURE.md](ARCHITECTURE.md) for analysis.*
+
 ## Introduction
 
 uringcore provides a drop-in replacement for Python's asyncio event loop, built on the io_uring interface available in Linux kernel 5.11+ (with advanced features optimal on 5.19+). The project targets use cases where low-latency I/O and high throughput are critical requirements.

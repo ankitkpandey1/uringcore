@@ -8,14 +8,14 @@
 A high-performance asyncio event loop for Linux using io_uring.
 
 ## Project Status
-**Current Phase:** Phase 6 (Performance Optimization & Polish) - **COMPLETE**
+**Current Phase:** Phase 10 (Lock-Free Scheduler Optimization) - **COMPLETE**
 
 `uringcore` is now a fully functional, high-performance, drop-in replacement for `asyncio` on Linux.
-It passes **99% of stdlib asyncio tests** and outperforms `uvloop` in many micro-benchmarks.
+It passes **85+ tests** including FastAPI/Starlette E2E tests and outperforms `uvloop` in many micro-benchmarks.
 
 ## Key Features
 - **Pure io_uring**: No `epoll`/`selector` fallback. All I/O is submitted to the ring.
-- **Native Task Scheduling**: Custom Rust-based scheduler with batch drain optimization.
+- **Lock-Free Scheduler**: MPSC channel using `crossbeam-channel` for high-concurrency task scheduling.
 - **Zero-Copy Buffers**: Pre-registered fixed buffers for maximum I/O bandwidth.
 - **Native Futures**: Optimized Future implementation entirely in Rust.
 - **Asyncio Function Caching**: Cached `_enter_task`/`_leave_task` to reduce per-step overhead.
@@ -27,9 +27,12 @@ It passes **99% of stdlib asyncio tests** and outperforms `uvloop` in many micro
 
 ## Benchmarks
 Latest results (Jan 2026) vs `uvloop`:
-- `sleep(0)`: **2.3x faster** (5.24µs vs 12.20µs)
-- `future_res`: **2.8x faster** (4.48µs vs 12.42µs)
-- `create_task`: **1.5x faster** (8.97µs vs 13.46µs)
+- `sleep(0)`: **2.8x faster** (7.30µs vs 20.77µs)
+- `semaphore`: **3.2x faster** (6.48µs vs 20.59µs)
+- `wait_for`: **2.3x faster** (8.56µs vs 19.91µs)
+- `call_later`: **1.3x faster** (13.53µs vs 17.55µs)
+
+See [BENCHMARK.md](BENCHMARK.md) for detailed analysis.
 
 ## Introduction
 

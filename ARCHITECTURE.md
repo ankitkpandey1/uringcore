@@ -473,20 +473,20 @@ Expose runtime metrics (inflight buffers, queue lengths, completion latency, buf
 
 ---
 
-## Native Task Scheduling (Phase 3)
+## Native Task Scheduling (Phase 3 + Phase 10)
 
 `uringcore` moves the scheduling logic entirely to Rust to reduce Python overhead.
 
 ### Components
 
 1.  **UringTask**: A PyObject wrapping the coroutine. It implements a `_step(value, exc)` method (similar to `_run` in asyncio).
-2.  **Scheduler**: A Rust `Mutex<VecDeque<PyObject>>` that stores tasks ready to run.
+2.  **Scheduler**: A **lock-free MPSC channel** using `crossbeam-channel` that stores tasks ready to run.
 3.  **run_tick**: The main loop iteration logic in Rust that drains the scheduler queue and executes tasks.
 
-**Optimization**:
-- `call_soon` pushes directly to the Rust queue.
-- `run_tick` consumes the queue in a single lock acquisition (batch drain).
-- Tasks are executed without crossing the language boundary for queue management.
+**Phase 10 Optimizations**:
+- `Mutex<VecDeque>` replaced with `crossbeam-channel` for lock-free push/drain
+- Ring lock acquisitions merged (submit + drain_completions in single lock)
+- Python loop skips `epoll.poll` when ready tasks exist
 
 ## Native Futures (Phase 5)
 
@@ -531,7 +531,8 @@ The following state-of-the-art optimizations have been implemented or are availa
 | **Asyncio Function Caching** | ✅ Active | N/A |
 | **Native Timers** (`IORING_OP_TIMEOUT`) | ✅ Available | 5.4+ |
 | **Multishot Recv** (`IORING_OP_RECV` + `RECV_MULTISHOT`) | ✅ Available | 5.19+ |
-| **Batch Drain Scheduler** | ✅ Active | N/A |
+| **Lock-Free Scheduler** (`crossbeam-channel`) | ✅ Active | N/A |
+| **Merged Ring Lock** (single lock per run_tick) | ✅ Active | N/A |
 | **Registered FD Table** (`IOSQE_FIXED_FILE`) | ✅ Available | 5.1+ |
 | **Zero-Copy Send** (`IORING_OP_SEND_ZC`) | ✅ Available | 6.0+ |
 
@@ -553,11 +554,10 @@ The following state-of-the-art optimizations have been implemented or are availa
 
 ## Future Work
 
-1. **Registered FD Table**: Use `IORING_REGISTER_FILES` to eliminate per-op FD lookup overhead.
-2. **Provided Buffer Ring**: Let kernel select buffers automatically via `REGISTER_PBUF_RING`.
-3. **Zero-Copy Send**: Implement `IORING_OP_SEND_ZC` for large payloads (>4KB).
-4. **nogil Python 3.13+**: Test and optimize for free-threaded Python.
-5. **eBPF Integration**: XDP for packet steering to bypass kernel network stack.
+1. **nogil Python 3.13+**: Test and optimize for free-threaded Python.
+2. **eBPF Integration**: XDP for packet steering to bypass kernel network stack.
+3. **kTLS Integration**: Kernel-level TLS for encrypted I/O without userspace overhead.
+4. **Further Rust Migration**: Move more Python logic to Rust to eliminate PyO3 boundary overhead.
 
 ---
 

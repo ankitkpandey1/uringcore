@@ -153,6 +153,10 @@ pub struct Ring {
     is_active: AtomicBool,
     /// Buffer pool reference for registered buffers
     buffer_pool: Option<Arc<BufferPool>>,
+    /// SOTA: Registered FD table (IOSQE_FIXED_FILE)
+    registered_fds: Option<Vec<RawFd>>,
+    /// SOTA: Provided buffer ring group ID
+    provided_buf_group_id: Option<u16>,
 }
 
 impl Ring {
@@ -182,6 +186,8 @@ impl Ring {
             original_pid: std::process::id(),
             is_active: AtomicBool::new(true),
             buffer_pool: None,
+            registered_fds: None,
+            provided_buf_group_id: None,
         })
     }
 
@@ -606,24 +612,99 @@ impl Ring {
         })
     }
 
+    // =========================================================================
+    // SOTA 2025: Registered FD Table (IOSQE_FIXED_FILE)
+    // =========================================================================
+
+    /// Register file descriptors for IOSQE_FIXED_FILE optimization.
+    ///
+    /// After registration, use `prep_recv_fixed(fd_index, ...)` instead of raw FDs.
+    /// This eliminates per-operation FD lookup overhead.
+    pub fn register_fds(&mut self, fds: &[RawFd]) -> Result<()> {
+        self.ring
+            .submitter()
+            .register_files(fds)
+            .map_err(|e| Error::RingOp(format!("register_files failed: {e}")))?;
+        self.registered_fds = Some(fds.to_vec());
+        Ok(())
+    }
+
+    /// Unregister previously registered file descriptors.
+    pub fn unregister_fds(&mut self) -> Result<()> {
+        if self.registered_fds.is_some() {
+            self.ring
+                .submitter()
+                .unregister_files()
+                .map_err(|e| Error::RingOp(format!("unregister_files failed: {e}")))?;
+            self.registered_fds = None;
+        }
+        Ok(())
+    }
+
+    /// Get the index of a registered FD, or None if not registered.
+    pub fn fd_index(&self, fd: RawFd) -> Option<u32> {
+        self.registered_fds
+            .as_ref()
+            .and_then(|fds| fds.iter().position(|&f| f == fd).map(|i| i as u32))
+    }
+
+    // =========================================================================
+    // SOTA 2025: Zero-Copy Send (SEND_ZC)
+    // =========================================================================
+
+    /// Prepare zero-copy send (kernel 6.0+).
+    ///
+    /// For large payloads, avoids copying data into kernel.
+    ///
+    /// # Safety
+    ///
+    /// Buffer must remain valid until IORING_CQE_F_NOTIF completion.
+    pub unsafe fn prep_send_zc(
+        &mut self,
+        fd: RawFd,
+        buf: *const u8,
+        len: u32,
+        generation: u16,
+    ) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::SendZC, generation);
+
+        // Use SendZc opcode
+        let entry = opcode::SendZc::new(types::Fd(fd), buf, len)
+            .build()
+            .user_data(user_data);
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            sq.push(&entry)
+                .map_err(|_| Error::RingOp("push send_zc failed".into()))
+        })
+    }
+
     /// Get ring capabilities for feature detection.
     pub fn capabilities(&self) -> RingCapabilities {
         RingCapabilities {
             sqpoll: self.sqpoll_enabled,
+            registered_fds: self.registered_fds.is_some(),
             // Note: Full capability detection would require probing the kernel
             multishot_recv: true, // Assume available, will fail gracefully if not
             send_zc: true,        // Assume available, will fail gracefully if not
+            provided_buffers: self.provided_buf_group_id.is_some(),
         }
     }
 
     /// Shutdown the ring.
     pub fn shutdown(&mut self) {
         self.is_active.store(false, Ordering::SeqCst);
-        // Explicitly unregister buffers to release locked memory immediately
+        // Explicitly unregister buffers and FDs to release resources
         if self.buffer_pool.is_some() {
             let _ = self.ring.submitter().unregister_buffers();
-            // Clear the pool ref so we don't try again in drop or double-free (though io_uring is safe)
             self.buffer_pool = None;
+        }
+        if self.registered_fds.is_some() {
+            let _ = self.ring.submitter().unregister_files();
+            self.registered_fds = None;
         }
     }
 }
@@ -633,10 +714,14 @@ impl Ring {
 pub struct RingCapabilities {
     /// SQPOLL mode enabled
     pub sqpoll: bool,
+    /// Registered FD table active
+    pub registered_fds: bool,
     /// Multishot recv available (kernel 5.19+)
     pub multishot_recv: bool,
     /// Zero-copy send available (kernel 6.0+)
     pub send_zc: bool,
+    /// Provided buffer ring active
+    pub provided_buffers: bool,
 }
 
 impl Drop for Ring {

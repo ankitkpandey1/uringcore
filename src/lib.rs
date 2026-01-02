@@ -75,7 +75,7 @@ pub mod handle;
 pub mod ring;
 pub mod scheduler;
 pub mod state;
-pub mod task;
+// pub mod task; // Removed in favor of asyncio.Task implementation
 pub mod timer;
 
 use pyo3::prelude::*;
@@ -111,6 +111,12 @@ pub struct UringCore {
     futures: Mutex<HashMap<i32, PyObject>>,
     /// Provided Buffer Ring (SOTA)
     pbuf_ring: Option<Arc<buf_ring::PBufRing>>,
+    /// Reader callbacks: fd -> (callback, args)
+    readers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
+    /// Writer callbacks: fd -> (callback, args)
+    writers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
+    /// Stopping flag for `run_until_stopped`
+    stopping: std::sync::atomic::AtomicBool,
 }
 
 #[pymethods]
@@ -123,7 +129,7 @@ impl UringCore {
     /// * `ring_size` - Size of the submission queue (default: 4096)
     /// * `try_sqpoll` - Whether to try SQPOLL mode (default: true)
     #[new]
-    #[pyo3(signature = (buffer_size=65536, buffer_count=1024, ring_size=4096, try_sqpoll=true))]
+    #[pyo3(signature = (buffer_size=65536, buffer_count=4096, ring_size=4096, try_sqpoll=true))]
     fn new(
         buffer_size: usize,
         buffer_count: usize,
@@ -193,6 +199,9 @@ impl UringCore {
             scheduler: Scheduler::new(),
             futures: Mutex::new(HashMap::new()),
             pbuf_ring,
+            readers: Mutex::new(HashMap::new()),
+            writers: Mutex::new(HashMap::new()),
+            stopping: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -508,7 +517,16 @@ impl UringCore {
         }
 
         // Track inflight buffer for this FD (for completion data extraction)
-        self.inflight_recv_buffers.lock().insert(fd, buf_idx); // u16 buf_idx check type
+        // IMPORTANT: If there's already a buffer tracked for this FD (fd reuse case),
+        // we must release it first to prevent memory leak
+        {
+            let mut inflight = self.inflight_recv_buffers.lock();
+            if let Some(old_buf_idx) = inflight.insert(fd, buf_idx) {
+                // Release the old buffer that was overwritten
+                self.buffer_pool
+                    .release(old_buf_idx, self.buffer_pool.generation_id());
+            }
+        }
 
         // Flush to kernel
         self.ring
@@ -887,15 +905,7 @@ impl UringCore {
         let ready_batch = self.scheduler.drain();
 
         for handle in ready_batch {
-            if let Ok(task) = handle.downcast_bound::<task::UringTask>(py) {
-                // Fast path: UringTask (most common in gather) - pass scheduler for direct push
-                if let Err(e) =
-                    task.borrow()
-                        .run_step(py, task.as_unbound().clone_ref(py), &self.scheduler)
-                {
-                    e.print(py);
-                }
-            } else if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
+            if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
                 // Execute timer callback
                 // asyncio.TimerHandle._run() executes the callback
                 if let Err(e) = uring_handle.borrow().execute(py) {
@@ -919,6 +929,150 @@ impl UringCore {
 
         Ok(results)
     }
+
+    // =========================================================================
+    // Reader/Writer Management (for Rust-native event loop)
+    // =========================================================================
+
+    /// Add a reader callback for a file descriptor.
+    fn add_reader(&self, fd: i32, callback: PyObject, args: PyObject) {
+        self.readers.lock().insert(fd, (callback, args));
+    }
+
+    /// Remove a reader callback.
+    fn remove_reader(&self, fd: i32) -> bool {
+        self.readers.lock().remove(&fd).is_some()
+    }
+
+    /// Add a writer callback for a file descriptor.
+    fn add_writer(&self, fd: i32, callback: PyObject, args: PyObject) {
+        self.writers.lock().insert(fd, (callback, args));
+    }
+
+    /// Remove a writer callback.
+    fn remove_writer(&self, fd: i32) -> bool {
+        self.writers.lock().remove(&fd).is_some()
+    }
+
+    /// Set the stopping flag.
+    fn stop(&self) {
+        self.stopping
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Clear the stopping flag.
+    fn clear_stop(&self) {
+        self.stopping
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Check if stopping.
+    fn is_stopping(&self) -> bool {
+        self.stopping.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Run the event loop until stopped.
+    /// This is the Rust-native event loop that eliminates FFI overhead.
+    #[pyo3(signature = (epoll_fd))]
+    fn run_until_stopped(&self, py: Python<'_>, epoll_fd: i32) -> PyResult<()> {
+        // Clear stopping flag
+        self.stopping
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+
+        let mut events: [libc::epoll_event; 64] = unsafe { std::mem::zeroed() };
+        let eventfd = self.ring.lock().event_fd();
+
+        loop {
+            // Check stopping flag
+            if self.stopping.load(std::sync::atomic::Ordering::SeqCst) {
+                break;
+            }
+
+            // Calculate timeout based on next timer
+            let timeout_ms = if !self.scheduler.is_empty() {
+                0 // Tasks ready, don't block
+            } else if let Some(next_exp) = self.timers.next_expiration() {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs_f64();
+                let delay = (next_exp - now).max(0.0);
+                (delay * 1000.0) as i32
+            } else {
+                100 // Default timeout ms
+            };
+
+            // epoll_wait (release GIL during blocking)
+            let nfds = py.allow_threads(|| unsafe {
+                libc::epoll_wait(epoll_fd, events.as_mut_ptr(), 64, timeout_ms)
+            });
+
+            if nfds < 0 {
+                let err = std::io::Error::last_os_error();
+                if err.kind() == std::io::ErrorKind::Interrupted {
+                    continue; // EINTR, retry
+                }
+                return Err(PyErr::new::<pyo3::exceptions::PyOSError, _>(
+                    err.to_string(),
+                ));
+            }
+
+            // Process epoll events
+            for event in events.iter().take(nfds as usize) {
+                let fd = event.u64 as i32;
+                let event_mask = event.events;
+
+                if fd == eventfd {
+                    // io_uring completion signal
+                    let _ = self.ring.lock().drain_eventfd();
+                } else {
+                    // Reader/writer callbacks
+                    let read_mask = (libc::EPOLLIN | libc::EPOLLHUP | libc::EPOLLERR) as u32;
+                    if event_mask & read_mask != 0 {
+                        let maybe_reader = {
+                            let readers = self.readers.lock();
+                            readers
+                                .get(&fd)
+                                .map(|(cb, args)| (cb.clone_ref(py), args.clone_ref(py)))
+                        };
+                        if let Some((callback, args)) = maybe_reader {
+                            if let Ok(args_tuple) = args.downcast_bound::<pyo3::types::PyTuple>(py)
+                            {
+                                if let Err(e) = callback.call1(py, args_tuple) {
+                                    e.print(py);
+                                }
+                            } else if let Err(e) = callback.call0(py) {
+                                e.print(py);
+                            }
+                        }
+                    }
+                    if event_mask & libc::EPOLLOUT as u32 != 0 {
+                        let maybe_writer = {
+                            let writers = self.writers.lock();
+                            writers
+                                .get(&fd)
+                                .map(|(cb, args)| (cb.clone_ref(py), args.clone_ref(py)))
+                        };
+                        if let Some((callback, args)) = maybe_writer {
+                            if let Ok(args_tuple) = args.downcast_bound::<pyo3::types::PyTuple>(py)
+                            {
+                                if let Err(e) = callback.call1(py, args_tuple) {
+                                    e.print(py);
+                                }
+                            } else if let Err(e) = callback.call0(py) {
+                                e.print(py);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Run one tick (timers + completions + tasks)
+            let _ = self.run_tick(py, None)?;
+        }
+
+        Ok(())
+    }
 }
 
 /// A Python module implemented in Rust.
@@ -926,7 +1080,7 @@ impl UringCore {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UringCore>()?;
     m.add_class::<UringHandle>()?;
-    m.add_class::<task::UringTask>()?;
+    // m.add_class::<task::UringTask>()?; // Removed
     m.add_class::<future::UringFuture>()?;
     m.add_class::<handle::UringHandle>()?;
 

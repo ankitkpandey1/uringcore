@@ -20,8 +20,10 @@ from typing import (
 )
 from os import PathLike
 
-from uringcore._core import UringCore, UringFuture, UringTask, UringHandle
+from uringcore._core import UringCore, UringFuture, UringHandle
 from uringcore.subprocess import SubprocessTransport
+from uringcore.pipes import ReadPipeTransport, WritePipeTransport
+from uringcore.ssl_transport import SSLTransport
 
 _ProtocolT = TypeVar("_ProtocolT", bound=asyncio.BaseProtocol)
 
@@ -180,6 +182,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         old_loop = asyncio._get_running_loop()
         try:
             asyncio._set_running_loop(self)
+            # Python loop is faster than Rust FFI overhead for callback execution
             while not self._stopping:
                 self._run_once()
         finally:
@@ -540,6 +543,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             self._epoll.modify(fd, mask)
 
         self._readers[fd] = (callback, args)
+        # Register with Rust core for native event loop
+        self._core.add_reader(fd, callback, args)
 
     def remove_reader(self, fd: int | Any) -> bool:
         """Stop watching a file descriptor for read availability."""
@@ -553,6 +558,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             return False
 
         del self._readers[fd]
+        # Remove from Rust core
+        self._core.remove_reader(fd)
 
         # Update epoll registration
         if fd in self._writers:
@@ -591,6 +598,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             self._epoll.modify(fd, mask)
 
         self._writers[fd] = (callback, args)
+        # Register with Rust core for native event loop
+        self._core.add_writer(fd, callback, args)
 
     def remove_writer(self, fd) -> bool:
         """Stop watching a file descriptor for write availability."""
@@ -604,6 +613,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             return False
 
         del self._writers[fd]
+        # Remove from Rust core
+        self._core.remove_writer(fd)
 
         # Update epoll registration
         if fd in self._readers:
@@ -625,7 +636,9 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
     def create_future(self) -> asyncio.Future[Any]:
         """Create a Future object attached to the loop."""
-        return UringFuture(self)
+        # Use standard asyncio.Future for full compatibility with asyncio internals
+        # (e.g., asyncio.sleep, asyncio.wait_for, etc.)
+        return asyncio.Future(loop=self)
 
     def create_task(self, coro, *, name=None, context=None):
         """Create a Task from a coroutine."""
@@ -633,13 +646,9 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         if self._task_factory is not None:
             return self._task_factory(self, coro)
 
-        # Use Rust-native UringTask for max performance
-        # Use Rust-native UringTask for max performance
-        task = UringTask(coro, self, name, context)
-        # Optimization: Push task directly to scheduler (avoiding UringHandle allocation)
-        # The task checks for _run() method which delegates to _step()
-        self._core.push_task(task)
-        return task
+        # Use standard asyncio.Task for full compatibility and C-optimized performance
+        # (UringTask proved to involve too much overhead for context management)
+        return asyncio.Task(coro, loop=self, name=name, context=context)
 
 
 
@@ -786,27 +795,100 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         protocol_factory: Callable[[], _ProtocolT],
         pipe: Any,
     ) -> tuple[asyncio.ReadTransport, _ProtocolT]:
-        raise NotImplementedError("connect_read_pipe not implemented")
+        """Register a read pipe.
+        
+        Args:
+            protocol_factory: Factory to create the protocol
+            pipe: A file-like object
+            
+        Returns:
+            (transport, protocol) pair
+        """
+        self._check_closed()
+        
+        try:
+           protocol = protocol_factory()
+        except Exception:
+           # Clean up pipe if protocol creation fails
+           try:
+               pipe.close()
+           except Exception:
+               pass
+           raise
+
+        transport = ReadPipeTransport(self, pipe, protocol)
+        return transport, protocol
 
     async def connect_write_pipe(
         self,
         protocol_factory: Callable[[], _ProtocolT],
         pipe: Any,
     ) -> tuple[asyncio.WriteTransport, _ProtocolT]:
-        raise NotImplementedError("connect_write_pipe not implemented")
+        """Register a write pipe.
+        
+        Args:
+           protocol_factory: Factory to create the protocol
+           pipe: A file-like object
+           
+        Returns:
+           (transport, protocol) pair
+        """
+        self._check_closed()
+        
+        try:
+            protocol = protocol_factory()
+        except Exception:
+            try:
+                pipe.close()
+            except Exception:
+                pass
+            raise
+            
+        transport = WritePipeTransport(self, pipe, protocol)
+        return transport, protocol
 
     async def start_tls(
         self,
         transport: asyncio.BaseTransport,
         protocol: asyncio.BaseProtocol,
-        sslcontext: Any,
+        sslcontext: ssl.SSLContext,
         *,
         server_side: bool = False,
         server_hostname: str | None = None,
         ssl_handshake_timeout: float | None = None,
-        ssl_shutdown_timeout: float | None = None,
-    ) -> asyncio.Transport | None:
-        raise NotImplementedError("start_tls not implemented")
+    ) -> asyncio.Transport:
+        """Upgrade a transport to TLS.
+        
+        Return a new transport that wraps the original transport.
+        """
+        self._check_closed()
+        
+        # Verify transport is valid
+        if not isinstance(transport, asyncio.Transport):
+            raise TypeError(f"transport must be an asyncio.Transport, not {type(transport).__name__}")
+            
+        # Create SSL transport wrapping the existing one
+        ssl_transport = SSLTransport(
+            self,
+            transport,
+            protocol,
+            sslcontext,
+            server_hostname=server_hostname,
+            server_side=server_side,
+        )
+        
+        # Perform handshake
+        try:
+             if ssl_handshake_timeout:
+                 await asyncio.wait_for(ssl_transport.do_handshake(), ssl_handshake_timeout)
+             else:
+                 await ssl_transport.do_handshake()
+        except Exception:
+             ssl_transport.close()
+             raise
+             
+        return ssl_transport
+
 
     # =========================================================================
     # Executor support

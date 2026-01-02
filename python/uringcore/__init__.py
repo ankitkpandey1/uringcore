@@ -33,7 +33,7 @@ from uringcore._core import (
     UringCore,
     UringFuture,
     UringHandle,
-    UringTask,
+    # UringTask,
     __version__,
     __author__,
 )
@@ -73,7 +73,7 @@ __all__ = [
     "new_event_loop",
     "UringFuture",
     "UringHandle",
-    "UringTask",
+    # "UringTask",
     "__version__",
     "__author__",
 ]

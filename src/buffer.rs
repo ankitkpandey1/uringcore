@@ -7,8 +7,7 @@
 // Lock ordering is intentional and correct
 #![allow(clippy::significant_drop_tightening)]
 
-use parking_lot::Mutex;
-use std::collections::VecDeque;
+use crossbeam_queue::SegQueue;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -19,7 +18,7 @@ use crate::error::{Error, Result};
 pub const DEFAULT_BUFFER_SIZE: usize = 64 * 1024;
 
 /// Default number of buffers in the pool (enough for high concurrency)
-pub const DEFAULT_BUFFER_COUNT: usize = 1024;
+pub const DEFAULT_BUFFER_COUNT: usize = 4096;
 
 /// Quarantine duration before buffer reuse (reduced for high throughput)
 const QUARANTINE_DURATION: Duration = Duration::from_micros(1);
@@ -87,9 +86,9 @@ pub struct BufferPool {
     /// Total allocated size
     total_size: usize,
     /// Free buffer indices available for use
-    free_list: Mutex<VecDeque<u16>>,
+    free_list: SegQueue<u16>,
     /// Buffers in quarantine waiting to be reused
-    quarantine: Mutex<VecDeque<QuarantineEntry>>,
+    quarantine: SegQueue<QuarantineEntry>,
     /// Current generation ID (incremented on fork)
     generation_id: AtomicU64,
 }
@@ -136,16 +135,18 @@ impl BufferPool {
         };
 
         // Initialize free list with all buffer indices
-        #[allow(clippy::cast_possible_truncation)]
-        let free_list: VecDeque<u16> = (0..buffer_count as u16).collect();
+        let free_list = SegQueue::new();
+        for i in 0..buffer_count as u16 {
+            free_list.push(i);
+        }
 
         Ok(Self {
             base,
             buffer_size,
             buffer_count,
             total_size,
-            free_list: Mutex::new(free_list),
-            quarantine: Mutex::new(VecDeque::new()),
+            free_list,
+            quarantine: SegQueue::new(),
             generation_id: AtomicU64::new(1),
         })
     }
@@ -177,10 +178,12 @@ impl BufferPool {
         // First, try to reclaim quarantined buffers
         self.reclaim_quarantined();
 
-        self.free_list.lock().pop_front()
+        self.free_list.pop()
     }
 
-    /// Return a buffer to the pool (goes through quarantine).
+    /// Return a buffer to the pool (immediate reuse - no quarantine).
+    /// Quarantine removed because in high-throughput scenarios, buffers
+    /// accumulate faster than 1µs reclamation causing exhaustion.
     pub fn release(&self, index: u16, generation_id: u64) {
         // Validate generation ID to prevent use-after-fork
         if generation_id != self.generation_id.load(Ordering::SeqCst) {
@@ -193,24 +196,23 @@ impl BufferPool {
             return;
         }
 
-        self.quarantine.lock().push_back(QuarantineEntry {
-            index,
-            release_time: Instant::now(),
-        });
+        // Direct release to free list for immediate reuse
+        self.free_list.push(index);
     }
 
     /// Reclaim buffers that have completed their quarantine period.
     fn reclaim_quarantined(&self) {
         let now = Instant::now();
-        let mut quarantine = self.quarantine.lock();
-        let mut free_list = self.free_list.lock();
 
-        while let Some(entry) = quarantine.front() {
+        // Process a batch of quarantined items
+        // We stop if we encounter an item that is not ready yet.
+        while let Some(entry) = self.quarantine.pop() {
             if now.duration_since(entry.release_time) >= QUARANTINE_DURATION {
-                if let Some(entry) = quarantine.pop_front() {
-                    free_list.push_back(entry.index);
-                }
+                self.free_list.push(entry.index);
             } else {
+                // Not ready, put it back and stop reclamation.
+                // Since this pushes to the back, we rely on the queue being roughly time-sorted.
+                self.quarantine.push(entry);
                 break;
             }
         }
@@ -285,8 +287,8 @@ impl BufferPool {
     /// Get statistics about buffer pool usage.
     #[must_use]
     pub fn stats(&self) -> BufferPoolStats {
-        let free_count = self.free_list.lock().len();
-        let quarantine_count = self.quarantine.lock().len();
+        let free_count = self.free_list.len();
+        let quarantine_count = self.quarantine.len();
         BufferPoolStats {
             total: self.buffer_count,
             free: free_count,

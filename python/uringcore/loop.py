@@ -638,9 +638,9 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         proto: int = 0,
         flags: int = 0,
     ) -> list[tuple[int, int, int, str, tuple[str, int] | tuple[str, int, int, int]]]:
-        return await self.run_in_executor(
-            None, socket.getaddrinfo, host, port, family, type, proto, flags
-        )
+        # Use synchronous getaddrinfo directly - it's fast for local addresses
+        # and avoids executor/threadsafe scheduling complexity
+        return socket.getaddrinfo(host, port, family, type, proto, flags)
 
     async def getnameinfo(
         self, sockaddr: tuple[str, int] | tuple[str, int, int, int], flags: int = 0

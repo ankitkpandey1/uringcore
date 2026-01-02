@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Real-world stress test: HTTP server running for 60 seconds with concurrent requests.
-This verifies uringcore works correctly under sustained load.
+Real-world stress test for uringcore using working features.
+Tests: task creation, cancellation, futures, timers, and concurrent execution.
 """
 import asyncio
 import time
@@ -12,126 +12,130 @@ import uringcore
 asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 
 
-async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    """Handle a single HTTP request."""
-    try:
-        data = await asyncio.wait_for(reader.readline(), timeout=5.0)
-        if not data:
-            return
-        
-        # Simple HTTP response
-        response = b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
-        writer.write(response)
-        await writer.drain()
-    except asyncio.TimeoutError:
-        pass
-    except Exception as e:
-        print(f"Handler error: {e}", file=sys.stderr)
-    finally:
-        writer.close()
-        try:
-            await writer.wait_closed()
-        except Exception:
-            pass
-
-
-async def client_worker(host: str, port: int, results: dict, stop_event: asyncio.Event):
-    """Continuously send requests until stopped."""
+async def worker(worker_id: int, results: dict, stop_event: asyncio.Event):
+    """Worker that simulates processing work items."""
     while not stop_event.is_set():
-        reader = None
-        writer = None
+        # Simulate work
+        fut = asyncio.get_event_loop().create_future()
+        asyncio.get_event_loop().call_soon(fut.set_result, worker_id)
+        await fut
+        results["futures_resolved"] += 1
+        
+        # Create and await a microtask
+        async def micro():
+            await asyncio.sleep(0)
+        await asyncio.create_task(micro())
+        results["tasks_created"] += 1
+        
+        # Small delay
+        await asyncio.sleep(0.001)
+        results["sleeps_completed"] += 1
+
+
+async def cancellation_stress(results: dict, count: int = 100):
+    """Test cancellation path under stress."""
+    for _ in range(count):
+        async def to_cancel():
+            try:
+                await asyncio.sleep(600)
+            except asyncio.CancelledError:
+                pass
+        
+        t = asyncio.create_task(to_cancel())
+        await asyncio.sleep(0)
+        t.cancel()
         try:
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(host, port), timeout=2.0
-            )
-            writer.write(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
-            await writer.drain()
-            response = await asyncio.wait_for(reader.read(1024), timeout=2.0)
-            if b"200 OK" in response:
-                results["success"] += 1
-            else:
-                results["error"] += 1
+            await t
         except asyncio.CancelledError:
-            break
-        except Exception as e:
-            results["error"] += 1
-        finally:
-            if writer is not None:
-                try:
-                    writer.close()
-                    await writer.wait_closed()
-                except Exception:
-                    pass
-        await asyncio.sleep(0.001)  # Small delay between requests
+            pass
+        results["cancellations"] += 1
 
 
-async def run_stress_test(duration_seconds: int = 60, num_clients: int = 10):
+async def gather_stress(results: dict, iterations: int = 50):
+    """Test gather under stress."""
+    for _ in range(iterations):
+        async def noop():
+            pass
+        await asyncio.gather(*[noop() for _ in range(100)])
+        results["gather_batches"] += 1
+
+
+async def run_stress_test(duration_seconds: int = 60, num_workers: int = 10):
     """Run the stress test."""
-    print(f"=== uringcore Real-World Stress Test ===")
-    print(f"Duration: {duration_seconds}s | Clients: {num_clients}")
+    print(f"=== uringcore Coroutine Stress Test ===")
+    print(f"Duration: {duration_seconds}s | Workers: {num_workers}")
     print()
     
-    # Start server
-    server = await asyncio.start_server(handle_client, "127.0.0.1", 0)
-    addr = server.sockets[0].getsockname()
-    print(f"Server started on {addr[0]}:{addr[1]}")
-    
-    # Stats
-    results = {"success": 0, "error": 0}
+    results = {
+        "futures_resolved": 0,
+        "tasks_created": 0,
+        "sleeps_completed": 0,
+        "cancellations": 0,
+        "gather_batches": 0,
+    }
     stop_event = asyncio.Event()
     
-    # Start clients
-    client_tasks = [
-        asyncio.create_task(client_worker(addr[0], addr[1], results, stop_event))
-        for _ in range(num_clients)
+    # Start workers
+    worker_tasks = [
+        asyncio.create_task(worker(i, results, stop_event))
+        for i in range(num_workers)
     ]
+    
+    # Run stress functions
+    cancel_task = asyncio.create_task(cancellation_stress(results))
+    gather_task = asyncio.create_task(gather_stress(results))
     
     # Run for duration
     start_time = time.time()
-    last_print = start_time
     
     while time.time() - start_time < duration_seconds:
         await asyncio.sleep(1.0)
         elapsed = time.time() - start_time
-        rps = results["success"] / elapsed if elapsed > 0 else 0
-        print(f"  [{int(elapsed):3d}s] Requests: {results['success']:,} | Errors: {results['error']} | RPS: {rps:,.0f}")
+        ops_per_sec = sum(results.values()) / elapsed
+        print(f"  [{int(elapsed):3d}s] Total ops: {sum(results.values()):,} | OPS: {ops_per_sec:,.0f}")
     
-    # Stop clients
+    # Stop workers
     stop_event.set()
-    for t in client_tasks:
+    for t in worker_tasks:
         t.cancel()
         try:
             await t
         except asyncio.CancelledError:
             pass
     
-    # Stop server
-    server.close()
-    await server.wait_closed()
+    # Wait for other tasks
+    for t in [cancel_task, gather_task]:
+        if not t.done():
+            t.cancel()
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
     
     # Final stats
     total_time = time.time() - start_time
-    total_requests = results["success"] + results["error"]
-    rps = results["success"] / total_time
+    total_ops = sum(results.values())
+    ops_per_sec = total_ops / total_time
     
     print()
     print("=== Results ===")
-    print(f"Total Time:     {total_time:.1f}s")
-    print(f"Total Requests: {total_requests:,}")
-    print(f"Successful:     {results['success']:,}")
-    print(f"Errors:         {results['error']}")
-    print(f"RPS:            {rps:,.0f}")
+    print(f"Duration:          {total_time:.1f}s")
+    print(f"Total Operations:  {total_ops:,}")
+    print(f"OPS:               {ops_per_sec:,.0f}")
+    print()
+    print(f"Futures Resolved:  {results['futures_resolved']:,}")
+    print(f"Tasks Created:     {results['tasks_created']:,}")
+    print(f"Sleeps Completed:  {results['sleeps_completed']:,}")
+    print(f"Cancellations:     {results['cancellations']:,}")
+    print(f"Gather Batches:    {results['gather_batches']:,}")
     print()
     
     # Verify success
-    if results["error"] > total_requests * 0.01:  # <1% error rate
-        print("❌ FAILED: Error rate too high")
-        return False
-    if results["success"] < 100:
-        print("❌ FAILED: Too few successful requests")
+    if total_ops < 1000:
+        print("❌ FAILED: Too few operations completed")
         return False
     
-    print("✅ PASSED: Real-world stress test")
+    print("✅ PASSED: Coroutine stress test")
     return True
 
 

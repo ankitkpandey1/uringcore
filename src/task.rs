@@ -272,7 +272,19 @@ impl UringTask {
                         .map_or_else(|_| py.None(), std::convert::Into::into);
                     future.call_method1(py, "set_result", (ret_val,))?;
                 } else {
-                    future.call_method1(py, "set_exception", (e,))?;
+                    // Check if it's a CancelledError - use cancel() instead of set_exception()
+                    let asyncio = py.import("asyncio")?;
+                    let cancelled_error_type = asyncio.getattr("CancelledError")?;
+                    let builtins = py.import("builtins")?;
+                    let is_cancelled: bool = builtins
+                        .call_method1("isinstance", (e.value(py), cancelled_error_type))?
+                        .extract()?;
+                    if is_cancelled {
+                        // Cancel the future properly
+                        future.call_method0(py, "cancel")?;
+                    } else {
+                        future.call_method1(py, "set_exception", (e,))?;
+                    }
                 }
             }
         }

@@ -36,4 +36,14 @@ impl Scheduler {
     pub fn len(&self) -> usize {
         self.ready.lock().len()
     }
+
+    /// Drain all items from the queue in one lock acquisition.
+    pub fn drain(&self) -> Vec<PyObject> {
+        self.ready.lock().drain(..).collect()
+    }
+
+    /// Clear all items from the queue.
+    pub fn clear(&self) {
+        self.ready.lock().clear();
+    }
 }

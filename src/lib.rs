@@ -677,30 +677,28 @@ impl UringCore {
             }
         }
 
-        // 4. Run ready tasks
-        let max_exec = 10000;
+        // 4. Run ready tasks (BATCH DRAIN for performance)
+        let ready_batch = self.scheduler.drain();
         let mut executed = 0;
 
-        while let Some(handle) = self.scheduler.pop() {
-            if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
+        for handle in ready_batch {
+            if let Ok(task) = handle.downcast_bound::<task::UringTask>(py) {
+                // Fast path: UringTask (most common in gather)
+                if let Err(e) = task.borrow().run_step(py, task.as_unbound().clone_ref(py)) {
+                    e.print(py);
+                }
+            } else if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
                 let refs = uring_handle.borrow();
                 if let Err(e) = refs.execute(py) {
                     e.print(py);
                 }
-            } else if let Ok(task) = handle.downcast_bound::<task::UringTask>(py) {
-                if let Err(e) = task.borrow().run_step(py, task.as_unbound().clone_ref(py)) {
-                    e.print(py);
-                }
             } else {
+                // Fallback for generic Python callables
                 if let Err(e) = handle.bind(py).call_method0("_run") {
                     e.print(py);
                 }
             }
-
             executed += 1;
-            if executed >= max_exec {
-                break;
-            }
         }
 
         Ok(n_timers + completed_io + executed)

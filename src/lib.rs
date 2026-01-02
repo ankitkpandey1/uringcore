@@ -680,15 +680,11 @@ impl UringCore {
             count
         };
 
-        // 2. Submit pending I/O (flush ring)
-        self.ring
-            .lock()
-            .submit()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-
-        // 3. Process Completions (Native Phase 4)
+        // 2. Submit pending I/O and process completions (single lock acquisition)
         {
             let mut ring = self.ring.lock();
+            ring.submit()
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             let completions = ring.drain_completions();
 
             for cqe in completions {

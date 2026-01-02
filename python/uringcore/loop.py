@@ -258,32 +258,30 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
     def _run_once(self):
         """Run one iteration of the event loop."""
-        timeout = self._calculate_timeout()
+        # Fast path: if tasks are ready, skip epoll entirely
+        if self._core.ready_len() == 0:
+            timeout = self._calculate_timeout()
 
-        # Wait for epoll events (eventfd + reader/writer FDs)
-        events = self._epoll.poll(timeout)
+            # Wait for epoll events (eventfd + reader/writer FDs)
+            events = self._epoll.poll(timeout)
 
-        # Process events
-        for fd, event_mask in events:
-            if fd == self._core.event_fd:
-                # io_uring completion signal / wakeup
-                self._core.drain_eventfd()
-                # Completions processed by run_tick below
-            else:
-                # Reader/writer callback
-                if event_mask & select.EPOLLIN and fd in self._readers:
-                    callback, args = self._readers[fd]
-                    handle = asyncio.Handle(callback, args, self)
-                    self._core.push_task(handle)
-                if event_mask & select.EPOLLOUT and fd in self._writers:
-                    callback, args = self._writers[fd]
-                    handle = asyncio.Handle(callback, args, self)
-                    self._core.push_task(handle)
+            # Process events
+            for fd, event_mask in events:
+                if fd == self._core.event_fd:
+                    # io_uring completion signal / wakeup
+                    self._core.drain_eventfd()
+                else:
+                    # Reader/writer callback
+                    if event_mask & select.EPOLLIN and fd in self._readers:
+                        callback, args = self._readers[fd]
+                        handle = asyncio.Handle(callback, args, self)
+                        self._core.push_task(handle)
+                    if event_mask & select.EPOLLOUT and fd in self._writers:
+                        callback, args = self._writers[fd]
+                        handle = asyncio.Handle(callback, args, self)
+                        self._core.push_task(handle)
 
         # Run one tick of Rust scheduler (timers + ready queue)
-        # Timeout handled by epoll above, so we pass 0.0 (non-blocking)
-        # Run one tick of Rust scheduler (timers + ready queue)
-        # Timeout handled by epoll above, so we pass 0.0 (non-blocking)
         completions = self._core.run_tick(0.0)
         self._process_completions(completions)
 

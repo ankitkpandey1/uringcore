@@ -242,6 +242,10 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # No-op: we don't track async generators yet
         pass
 
+    def __reduce__(self):
+        """UringEventLoop cannot be pickled."""
+        raise TypeError("UringEventLoop cannot be pickled")
+
     async def shutdown_default_executor(self, wait=True):
         """Shutdown the default executor."""
         if hasattr(self, "_default_executor") and self._default_executor is not None:
@@ -272,10 +276,13 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                     self._core.drain_eventfd()
                 else:
                     # Reader/writer callback
-                    if event_mask & select.EPOLLIN and fd in self._readers:
+                    # Treat EPOLLHUP (16) and EPOLLERR (8) as readable so callback can handle EOF/Error
+                    read_mask = select.EPOLLIN | select.EPOLLHUP | select.EPOLLERR
+                    if event_mask & read_mask and fd in self._readers:
                         callback, args = self._readers[fd]
                         handle = asyncio.Handle(callback, args, self)
                         self._core.push_task(handle)
+                    
                     if event_mask & select.EPOLLOUT and fd in self._writers:
                         callback, args = self._writers[fd]
                         handle = asyncio.Handle(callback, args, self)
@@ -313,6 +320,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                 self._handle_accept_completion(fd, result)
             elif op_type == "accept_multi":
                 self._handle_accept_multi_completion(fd, result)
+            elif op_type == "recv_multi":
+                self._handle_recv_completion(fd, result, data)
             elif op_type == "close":
                 self._handle_close_completion(fd, result)
 
@@ -320,33 +329,35 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         """Handle a receive completion."""
         # Check for direct I/O future
         fut = self._io_futures.pop((fd, "recv"), None)
+        
         transport = self._transports.get(fd)
 
         if result > 0 and data:
-            if fut is not None and not fut.done():
-                fut.set_result(data)
-            elif transport:
-                # Data received - deliver to protocol
-                transport._data_received(data)
-                # Rearm receive
-                # FIXME: submit_recv consumes data! Should use PollAdd for readiness.
-                # Passing dummy future to verify signature
-                fut = self.create_future()
-                self._io_futures[(fd, "recv")] = fut
-                self._core.submit_recv(fd, fut)
+            if fut is not None:
+                if not fut.done():
+                    fut.set_result(data)
+                return
+
+            # STRICT NO FALLBACK FOR SUCCESS
+            # Duplication Guard: If we receive data but have no future, ignore it.
+            pass
         elif result == 0:
-            if fut is not None and not fut.done():
-                fut.set_result(b"")
-            elif transport:
-                # EOF
+            if fut is not None:
+                if not fut.done():
+                    fut.set_result(b"")
+                return
+            
+            # Fallback for EOF
+            if transport:
                 transport._eof_received()
         else:
-            if fut is not None and not fut.done():
-                # Convert result (negative errno) to exception
-
-                fut.set_exception(OSError(-result, os.strerror(-result)))
-            elif transport:
-                # Error
+            if fut is not None:
+                if not fut.done():
+                    fut.set_exception(OSError(-result, os.strerror(-result)))
+                return
+            
+            # Fallback for Error
+            if transport:
                 transport._error_received(result)
 
     def _handle_send_completion(self, fd: int, result: int):
@@ -355,58 +366,40 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         fut = self._io_futures.pop((fd, "send"), None)
         if fut is not None and not fut.done():
             if result >= 0:
-                fut.set_result(None)
+                fut.set_result(result)
             else:
-
                 fut.set_exception(OSError(-result, os.strerror(-result)))
-            # Don't return, allow transport to be notified if exists (shared FD logic?)
-            # Usually one or the other.
 
         transport = self._transports.get(fd)
-        if transport is None:
-            return
-
-        transport._send_completed(result)
+        if transport is not None:
+             transport._send_completed(result)
 
     def _handle_accept_completion(self, fd: int, result: int):
         """Handle an accept completion."""
-        server_info = self._servers.get(fd)
-        if server_info is None:
-            return
-
-        # Check for direct I/O future
         fut = self._io_futures.pop((fd, "accept"), None)
 
         if result >= 0:
             if fut is not None and not fut.done():
-                # For sock_accept, we need to return (conn, addr)
-                # We can't get addr easily from here without getpeername or modifying core to return it
-                # Typically accept returns the new FD.
-                # Let's create the socket object.
-                try:
-                    client_sock = socket.socket(fileno=result)
-                    client_sock.setblocking(False)
-                    # Get address
-                    try:
-                        addr = client_sock.getpeername()
-                    except OSError:
-                        addr = ("", 0)  # Fallback
-                    fut.set_result((client_sock, addr))
-                except Exception as e:
-                    fut.set_exception(e)
-
-            # New connection accepted (for server helper)
+                fut.set_result(result)
+            
+            # Always handle transport creation and re-arming
             if self._servers.get(fd):
                 client_fd = result
-                server, protocol_factory = self._servers[fd]  # Already retrieved
-                self._create_transport_for_accepted(client_fd, protocol_factory)
+                server, protocol_factory = self._servers[fd]
+                try:
+                   self._create_transport_for_accepted(client_fd, protocol_factory)
+                except Exception:
+                     try:
+                         os.close(client_fd)
+                     except OSError:
+                         pass
+
                 # Rearm accept for server
                 fut = self.create_future()
                 self._io_futures[(fd, "accept")] = fut
                 self._core.submit_accept(fd, fut)
         else:
             if fut is not None and not fut.done():
-
                 fut.set_exception(OSError(-result, os.strerror(-result)))
 
     def _handle_accept_multi_completion(self, fd: int, result: int):
@@ -1318,7 +1311,6 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         message = context.get("message")
         if not message:
             message = "Unhandled exception in event loop"
-
 
         # Log it (print for now, strict logging later)
         # print(f"Error: {message} {exc_info}")

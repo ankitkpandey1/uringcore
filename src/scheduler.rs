@@ -1,4 +1,4 @@
-use crossbeam_channel::{unbounded, Sender, Receiver};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use pyo3::prelude::*;
 
 /// A lock-free ready queue for Python tasks using crossbeam MPSC channel.
@@ -9,7 +9,14 @@ pub struct Scheduler {
     receiver: Receiver<PyObject>,
 }
 
+impl Default for Scheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scheduler {
+    #[must_use]
     pub fn new() -> Self {
         let (sender, receiver) = unbounded();
         Self { sender, receiver }
@@ -22,21 +29,25 @@ impl Scheduler {
     }
 
     /// Pop a task from the ready queue.
+    #[must_use]
     pub fn pop(&self) -> Option<PyObject> {
         self.receiver.try_recv().ok()
     }
 
     /// Check if the queue is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.receiver.is_empty()
     }
 
     /// Get the number of pending tasks.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.receiver.len()
     }
 
     /// Drain all items from the queue efficiently (lock-free iteration).
+    #[must_use]
     pub fn drain(&self) -> Vec<PyObject> {
         self.receiver.try_iter().collect()
     }

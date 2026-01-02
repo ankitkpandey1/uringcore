@@ -49,10 +49,22 @@ class SubprocessTransport(asyncio.SubprocessTransport):
             self._pipes[2] = ReadSubprocessPipeTransport(loop, proc.stderr, protocol, 2)
 
         # Start monitoring process exit
+        self._pidfd: Optional[int] = None
         self._start_exit_waiter()
 
     def _start_exit_waiter(self) -> None:
-        """Start a thread to wait for process exit."""
+        """Start waiting for process exit using pidfd or thread fallback."""
+        try:
+            # Linux 5.3+ supports pidfd_open
+            # Python 3.9+ exposes os.pidfd_open
+            if hasattr(os, "pidfd_open"):
+                self._pidfd = os.pidfd_open(self._pid, 0)
+                self._loop.add_reader(self._pidfd, self._on_pidfd_ready)
+                return
+        except (OSError, AttributeError):
+            pass
+
+        # Fallback to thread if pidfd not supported
         import threading
 
         def wait_for_exit():
@@ -61,6 +73,26 @@ class SubprocessTransport(asyncio.SubprocessTransport):
 
         thread = threading.Thread(target=wait_for_exit, daemon=True)
         thread.start()
+
+    def _on_pidfd_ready(self) -> None:
+        """Called when pidfd is readable (process exited)."""
+        if self._pidfd is not None:
+             self._loop.remove_reader(self._pidfd)
+             try:
+                 os.close(self._pidfd)
+             except OSError:
+                 pass
+             self._pidfd = None
+        
+        # Process has exited, wait() should return immediately
+        try:
+             # WNOHANG shouldn't be needed if pidfd signaled, but safer
+             # Actually for standard Popen, just wait() is fine as it reaps.
+             returncode = self._proc.wait()
+             self._process_exited(returncode)
+        except Exception:
+             # Should not happen
+             pass
 
     def _process_exited(self, returncode: int) -> None:
         """Called when the process exits."""
@@ -143,6 +175,14 @@ class SubprocessTransport(asyncio.SubprocessTransport):
 
         for pipe in self._pipes.values():
             pipe.close()
+
+        if self._pidfd is not None:
+             self._loop.remove_reader(self._pidfd)
+             try:
+                 os.close(self._pidfd)
+             except OSError:
+                 pass
+             self._pidfd = None
 
         if self._returncode is None:
             self.terminate()

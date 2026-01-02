@@ -598,6 +598,22 @@ The following state-of-the-art optimizations have been implemented or are availa
 
 ---
 
+## Phase 14: Stress Testing & Robustness
+
+### Timer Handle Cancellation Fix
+During stress testing, a critical issue was identified where `asyncio.TimerHandle` objects were executed by the Rust scheduler even after being cancelled in Python. This occurred because `TimerHandle.cancel()` clears the callback arguments (`_args = None`), leading to a `TypeError` when the Rust scheduler blindly invoked `_run()`.
+
+**Solution:**
+The Rust scheduler now checks `handle.cancelled()` before attempting execution. This ensures strict adherence to asyncio's cancellation semantics and prevents invalid execution of cleared handles.
+
+### Buffer Management under Load (ENOBUFS)
+High-throughput workloads (e.g., tight loops of small messages) depleted the `PBufRing` faster than the kernel could replenish it.
+
+**Solution:**
+Implemented strict buffer accounting and batched replenishment in the `RecvMulti` and `AcceptMulti` completion handlers. Buffers are returned to the ring immediately after PyBytes extraction, ensuring the kernel always has available buffers.
+
+---
+
 ## References
 
 1. Axboe, J. "Efficient IO with io_uring" (2019). https://kernel.dk/io_uring.pdf

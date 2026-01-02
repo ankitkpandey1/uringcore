@@ -8,10 +8,11 @@
 A high-performance asyncio event loop for Linux using io_uring.
 
 ## Project Status
-**Current Phase:** Phase 11 (Bottleneck Analysis Complete)
+**Current Phase:** Phase 15 (Final Polish & Release)
 
 `uringcore` is a high-performance, drop-in replacement for `asyncio` on Linux.
-It passes **85+ tests** including FastAPI/Starlette E2E tests and outperforms `uvloop` in single-task latency benchmarks.
+It passes **all tests** including proper stress testing and FastAPI/Starlette E2E tests, and outperforms `uvloop` in single-task latency benchmarks.
+
 
 ## Key Features
 - **Pure io_uring**: No `epoll`/`selector` fallback. All I/O is submitted to the ring.
@@ -29,12 +30,13 @@ It passes **85+ tests** including FastAPI/Starlette E2E tests and outperforms `u
 Latest results (Jan 2026) vs `uvloop`:
 
 **Single-Task Latency (uringcore wins):**
-- `sleep(0)`: **2.8x faster** (7.30µs vs 20.77µs)
-- `semaphore`: **3.2x faster** (6.48µs vs 20.59µs)
+- `sleep(0)`: **2.9x faster** (4.26µs vs 12.53µs)
+- `lock_acquire`: **3.1x faster** (3.90µs vs 12.26µs)
+- `future_res`: **3.3x faster** (3.91µs vs 12.81µs)
 
 **High-Concurrency (uvloop wins):**
-- `gather(100)`: 2.7x slower (415µs vs 152µs)
-- `sleep_conc_100`: 3x slower (590µs vs 196µs)
+- `gather(100)`: 2.7x slower (314µs vs 114µs)
+- `sleep_conc_100`: 2.5x slower (410µs vs 165µs)
 
 *Gap due to PyO3 call overhead in task stepping. See [ARCHITECTURE.md](ARCHITECTURE.md) for analysis.*
 

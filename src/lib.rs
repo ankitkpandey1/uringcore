@@ -51,12 +51,25 @@
 // match is clearer than map_or_else for error handling
 #![allow(clippy::option_if_let_else)]
 // PyO3 methods need self even if unused
+// PyO3 methods need self even if unused
 #![allow(clippy::unused_self)]
+// Allow too many lines in PyO3 wrapper functions
+#![allow(clippy::too_many_lines)]
+// Allow cast truncation as we explicitly handle buffer sizes < 4GB
+#![allow(clippy::cast_possible_truncation)]
+// Allow sign loss for benign casts (e.g. fd)
+#![allow(clippy::cast_sign_loss)]
+// Allow precision loss for benign casts (e.g. timestamp)
+#![allow(clippy::cast_precision_loss)]
+// Allow collapsible if-else for readability in error handling
+#![allow(clippy::collapsible_else_if)]
+// PyO3 naming conventions often trigger these (e.g. bid vs bgid)
+#![allow(clippy::similar_names)]
 
-pub mod buffer;
 pub mod buf_ring;
-pub mod fixed_fd;
+pub mod buffer;
 pub mod error;
+pub mod fixed_fd;
 pub mod future;
 pub mod handle;
 pub mod ring;
@@ -135,32 +148,36 @@ impl UringCore {
         // Use BGID 1 for the default group
         let bgid = 1;
         // Ring entries must be power of 2. Round up buffer_count to next power of 2.
-        let pbuf_entries = buffer_count.next_power_of_two() as u16; 
-        
+        let pbuf_entries = buffer_count.next_power_of_two() as u16;
+
         // Attempt to create and register PBufRing
         if let Ok(pr) = buf_ring::PBufRing::new(pbuf_entries, bgid) {
             // Unsafe: Getting pointers for registration
             let addr = pr.as_ptr() as u64;
-            
+
             // Try registration
             // SAFETY: addr is valid execution of PBufRing::new ensured valid layout
             if unsafe { ring.register_pbuf_ring(addr, pbuf_entries, bgid).is_ok() } {
-                tracing::info!("PBufRing registered with {} entries (BGID {})", pbuf_entries, bgid);
-                
+                tracing::info!(
+                    "PBufRing registered with {} entries (BGID {})",
+                    pbuf_entries,
+                    bgid
+                );
+
                 // Populate the ring with buffers from the pool
                 // We map buffer index 0..buffer_count to the ring
                 // The BufferPool owns the memory, PBufRing just indexes it for the kernel
-                
+
                 let pool_ref = &pool; // borrow for closure
-                
+
                 pr.add_buffers(buffer_count as u16, |i| {
-                     // SAFETY: i < buffer_count is guaranteed by loop bound
-                     let addr = unsafe { pool_ref.get_buffer_ptr(i) } as u64;
-                     let len = buffer_size as u32; // pool.buffer_size()
-                     let bid = i; // Buffer ID matches pool index
-                     (addr, len, bid)
+                    // SAFETY: i < buffer_count is guaranteed by loop bound
+                    let addr = unsafe { pool_ref.get_buffer_ptr(i) } as u64;
+                    let len = buffer_size as u32; // pool.buffer_size()
+                    let bid = i; // Buffer ID matches pool index
+                    (addr, len, bid)
                 });
-                
+
                 pbuf_ring = Some(Arc::new(pr));
             } else {
                 tracing::debug!("PBufRing registration failed (kernel too old?), skipping.");
@@ -270,6 +287,10 @@ impl UringCore {
         let completions = self.ring.lock().drain_completions();
         let mut results = Vec::with_capacity(completions.len());
 
+        // Track buffers to recycle to PBufRing
+        // We use a small local vector to batch updates
+        let mut recycled_pbuf_ids = Vec::new();
+
         for cqe in completions {
             let op_type = match cqe.op_type() {
                 OpType::Recv => "recv",
@@ -286,15 +307,28 @@ impl UringCore {
 
             // Create result tuple
             let tuple = if let Some(buf_idx) = cqe.buffer_index {
-                // RecvMulti case (not currently used)
+                // RecvMulti uses provided buffers (PBufRing)
+                // If the operation was RecvMulti, we need to track it for replenishment
+                // Note: buffer_index is provided by the kernel for RecvMulti
+
+                let is_multishot = cqe.op_type() == OpType::RecvMulti;
+
                 if cqe.result > 0 {
                     let data = unsafe {
                         self.buffer_pool
                             .get_buffer_slice(buf_idx, cqe.result as usize)
                     };
                     let py_bytes = PyBytes::new(py, data);
+
+                    // Release from pool (mark as free/consumable)
                     self.buffer_pool
                         .release(buf_idx, self.buffer_pool.generation_id());
+
+                    // If it was a provided buffer, queue for replenishment
+                    if is_multishot {
+                        recycled_pbuf_ids.push(buf_idx);
+                    }
+
                     (
                         cqe.fd(),
                         op_type,
@@ -303,12 +337,23 @@ impl UringCore {
                     )
                         .into_pyobject(py)?
                 } else {
+                    // Error or EOF
                     self.buffer_pool
                         .release(buf_idx, self.buffer_pool.generation_id());
+
+                    // Even on error, if a buffer was picked, we should recycle it?
+                    // Usually if result <= 0, no buffer is consumed "data-wise",
+                    // but the kernel might have Selected it.
+                    // However, for RecvMulti, if result < 0, typically no buffer is used unless partial?
+                    // But if buffer_index IS set, then a buffer WAS selected.
+                    if is_multishot {
+                        recycled_pbuf_ids.push(buf_idx);
+                    }
+
                     (cqe.fd(), op_type, cqe.result, py.None()).into_pyobject(py)?
                 }
             } else if cqe.op_type() == OpType::Recv {
-                // Recv with inflight buffer tracking
+                // Recv with inflight buffer tracking (Standard non-multishot recv)
                 // Decrement inflight count to allow recv rearm
                 let _ = self
                     .fd_states
@@ -347,6 +392,21 @@ impl UringCore {
             };
 
             results.push(tuple.into());
+        }
+
+        // Replenish PBufRing if we have recycled buffers and a ring is active
+        if !recycled_pbuf_ids.is_empty() {
+            if let Some(ref pr) = self.pbuf_ring {
+                let pool_ref = &self.buffer_pool;
+                let buf_size = pool_ref.buffer_size() as u32;
+
+                pr.add_buffers(recycled_pbuf_ids.len() as u16, |i| {
+                    let bid = recycled_pbuf_ids[i as usize];
+                    // Re-register the buffer with the kernel ring
+                    let addr = unsafe { pool_ref.get_buffer_ptr(bid) } as u64;
+                    (addr, buf_size, bid)
+                });
+            }
         }
 
         Ok(results)
@@ -472,16 +532,16 @@ impl UringCore {
         };
 
         let gen = self.ring.lock().generation_u16();
-        
+
         // Register future
         self.futures.lock().insert(fd, future);
         // Note: No specific buffer_index to track inflight, kernel provides it on completion.
-        
+
         self.ring
             .lock()
             .prep_recv_multishot(fd, bgid, gen)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
+
         // Submit immediately
         self.ring
             .lock()
@@ -544,16 +604,13 @@ impl UringCore {
     /// Uses `ACCEPT_MULTI` for efficient connection handling.
     fn submit_accept(&self, fd: i32, future: PyObject) -> PyResult<()> {
         let gen = self.ring.lock().generation_u16();
-        
+
         self.futures.lock().insert(fd, future);
-        
-        self.ring
-            .lock()
-            .prep_accept(fd, gen)
-            .map_err(|e| {
-                self.futures.lock().remove(&fd);
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
-            })?;
+
+        self.ring.lock().prep_accept(fd, gen).map_err(|e| {
+            self.futures.lock().remove(&fd);
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+        })?;
 
         // Flush to kernel
         self.ring
@@ -571,7 +628,7 @@ impl UringCore {
 
         // Note: We don't track a future for multishot accept because it
         // produces a stream of events. The Python loop handles dispatch.
-        
+
         // We use insert to mark that we accept completions for this FD
         // but we don't store a Python future because one doesn't exist yet.
         // We can store None? No, futures map expects PyObject.
@@ -756,7 +813,9 @@ impl UringCore {
                         }
                     } else {
                         // Success
-                        if matches!(op_type_str, OpType::Recv) || matches!(op_type_str, OpType::RecvMulti) {
+                        if matches!(op_type_str, OpType::Recv)
+                            || matches!(op_type_str, OpType::RecvMulti)
+                        {
                             if let Some(bytes) = data_bytes {
                                 if let Ok(uring_fut) =
                                     future.downcast_bound::<crate::future::UringFuture>(py)
@@ -814,8 +873,8 @@ impl UringCore {
                             }
                         }
                     }
-                        }
-            
+                }
+
                 // Add to results list for Python side processing (even if future resolved)
                 let data_obj = data_for_tuple.unwrap_or_else(|| py.None());
                 let op_str = op_type_str.as_str();
@@ -826,11 +885,14 @@ impl UringCore {
 
         // 4. Run ready tasks (BATCH DRAIN for performance)
         let ready_batch = self.scheduler.drain();
-        
+
         for handle in ready_batch {
             if let Ok(task) = handle.downcast_bound::<task::UringTask>(py) {
                 // Fast path: UringTask (most common in gather) - pass scheduler for direct push
-                if let Err(e) = task.borrow().run_step(py, task.as_unbound().clone_ref(py), &self.scheduler) {
+                if let Err(e) =
+                    task.borrow()
+                        .run_step(py, task.as_unbound().clone_ref(py), &self.scheduler)
+                {
                     e.print(py);
                 }
             } else if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
@@ -842,8 +904,15 @@ impl UringCore {
             } else {
                 // Should not happen for timers from our own loop
                 // but handle generic PyObject just in case
-                if let Err(e) = handle.call_method0(py, "_run") {
-                    e.print(py);
+                let is_cancelled = match handle.call_method0(py, "cancelled") {
+                    Ok(val) => val.is_truthy(py).unwrap_or(false),
+                    Err(_) => false, // If no cancelled method, assume not cancelled
+                };
+
+                if !is_cancelled {
+                    if let Err(e) = handle.call_method0(py, "_run") {
+                        e.print(py);
+                    }
                 }
             }
         }

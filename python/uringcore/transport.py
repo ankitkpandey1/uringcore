@@ -91,6 +91,7 @@ class UringSocketTransport(asyncio.Transport):
             self._recv_pending = True
             fut = self._loop.create_future()
             fut.add_done_callback(self._on_recv_complete)
+            self._loop._io_futures[(self._fd, "recv")] = fut
             self._loop._core.submit_recv(self._fd, fut)
         except Exception as exc:
             self._recv_pending = False

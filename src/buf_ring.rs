@@ -23,7 +23,7 @@ pub struct io_uring_buf {
     pub resv: u16,
 }
 
-/// Manages a Provided Buffer Ring (PBufRing) shared with the kernel.
+/// Manages a Provided Buffer Ring (`PBufRing`) shared with the kernel.
 pub struct PBufRing {
     ptr: NonNull<u8>,
     layout: Layout,
@@ -53,9 +53,8 @@ impl PBufRing {
         let total_size = header_size + entries_size;
 
         // Use page alignment (4096) to be safe and efficient
-        let layout = Layout::from_size_align(total_size, 4096).map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::OutOfMemory, "Invalid layout")
-        })?;
+        let layout = Layout::from_size_align(total_size, 4096)
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::OutOfMemory, "Invalid layout"))?;
 
         let ptr = unsafe {
             let p = alloc_zeroed(layout);
@@ -78,7 +77,7 @@ impl PBufRing {
 
         // Initialize tail to 0 (already zeroed by alloc_zeroed, but being explicit doesn't hurt)
         // unsynchronized access is fine here as we haven't shared it yet
-        
+
         Ok(ring)
     }
 
@@ -93,15 +92,22 @@ impl PBufRing {
         F: FnMut(u16) -> (u64, u32, u16),
     {
         unsafe {
+            // Pointer alignment is guaranteed by mmap (page aligned)
+            #[allow(clippy::cast_ptr_alignment)]
+            #[allow(clippy::ptr_as_ptr)]
             let header = self.ptr.as_ptr() as *mut io_uring_buf_ring_header;
             let tail = (*header).tail.load(Ordering::Relaxed);
-            let buf_base = self.ptr.as_ptr().add(std::mem::size_of::<io_uring_buf_ring_header>())
-                as *mut io_uring_buf;
+            #[allow(clippy::cast_ptr_alignment)]
+            let buf_base = self
+                .ptr
+                .as_ptr()
+                .add(std::mem::size_of::<io_uring_buf_ring_header>())
+                .cast::<io_uring_buf>();
 
             for i in 0..count {
                 let idx = (tail.wrapping_add(i)) & self.mask;
                 let (addr, len, bid) = get_buf(i);
-                
+
                 let buf_ptr = buf_base.add(idx as usize);
                 (*buf_ptr).addr = addr;
                 (*buf_ptr).len = len;
@@ -109,16 +115,20 @@ impl PBufRing {
             }
 
             // Commit tail update with Release ordering so kernel sees the writes
-            (*header).tail.store(tail.wrapping_add(count), Ordering::Release);
+            (*header)
+                .tail
+                .store(tail.wrapping_add(count), Ordering::Release);
         }
     }
 
     /// Get the memory address of the ring for registration.
+    #[must_use]
     pub fn as_ptr(&self) -> *mut u8 {
         self.ptr.as_ptr()
     }
 
     /// Get the Buffer Group ID.
+    #[must_use]
     pub fn bgid(&self) -> u16 {
         self.bgid
     }

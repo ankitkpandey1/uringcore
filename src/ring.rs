@@ -10,6 +10,12 @@
 #![allow(clippy::cast_sign_loss)]
 // Ring.ring is intentional naming
 #![allow(clippy::struct_field_names)]
+// FFI flags struct naturally has many bools
+#![allow(clippy::struct_excessive_bools)]
+// Allow potential wrap for timestamp casts
+#![allow(clippy::cast_possible_wrap)]
+// len() == 0 is sometimes clearer
+#![allow(clippy::len_zero)]
 
 use io_uring::{opcode, types, IoUring, Submitter};
 use nix::sys::eventfd::{EfdFlags, EventFd};
@@ -18,8 +24,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::buffer::BufferPool;
-use crate::fixed_fd::FixedFdTable;
 use crate::error::{Error, Result};
+use crate::fixed_fd::FixedFdTable;
 
 /// Default ring size (number of SQ entries)
 pub const DEFAULT_RING_SIZE: u32 = 4096;
@@ -120,6 +126,7 @@ impl OpType {
     }
 
     /// Convert to string slice.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Recv => "recv",
@@ -173,7 +180,7 @@ pub struct Ring {
     is_active: AtomicBool,
     /// Buffer pool reference for registered buffers
     buffer_pool: Option<Arc<BufferPool>>,
-    /// SOTA: Registered FD table (IOSQE_FIXED_FILE)
+    /// SOTA: Registered FD table (`IOSQE_FIXED_FILE`)
     registered_fds: Option<FixedFdTable>,
     /// SOTA: Provided buffer ring group ID
     provided_buf_group_id: Option<u16>,
@@ -577,9 +584,13 @@ impl Ring {
 
         // Use regular Accept instead of AcceptMulti for broader kernel compatibility
         let entry = if let Some(idx) = self.lookup_fixed(fd) {
-            opcode::Accept::new(types::Fixed(idx), std::ptr::null_mut(), std::ptr::null_mut())
-                .build()
-                .user_data(user_data)
+            opcode::Accept::new(
+                types::Fixed(idx),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+            .build()
+            .user_data(user_data)
         } else {
             opcode::Accept::new(types::Fd(fd), std::ptr::null_mut(), std::ptr::null_mut())
                 .build()
@@ -599,11 +610,7 @@ impl Ring {
     }
 
     /// Prepare a multishot accept operation.
-    pub fn prep_accept_multishot(
-        &mut self,
-        fd: RawFd,
-        generation: u16,
-    ) -> Result<()> {
+    pub fn prep_accept_multishot(&mut self, fd: RawFd, generation: u16) -> Result<()> {
         let user_data = encode_user_data(fd, OpType::AcceptMulti, generation);
 
         // Try using AcceptMulti opcode directly
@@ -711,7 +718,7 @@ impl Ring {
     /// Prepare a standalone timeout operation (native timer).
     ///
     /// Returns completion when `deadline_ns` (absolute monotonic time) is reached.
-    /// Use `encode_user_data(timer_id, OpType::Timeout, gen)` for user_data.
+    /// Use `encode_user_data(timer_id, OpType::Timeout, gen)` for `user_data`.
     pub fn prep_timeout(&mut self, deadline_ns: u64, user_data: u64) -> Result<()> {
         // Convert nanoseconds to timespec
         #[allow(clippy::cast_possible_truncation)]
@@ -755,13 +762,18 @@ impl Ring {
     /// Prepare multishot receive (kernel 5.19+).
     ///
     /// One submission handles ALL future data on this socket until cancelled.
-    /// Completions have CQE_F_MORE flag when more data is expected.
+    /// Completions have `CQE_F_MORE` flag when more data is expected.
     ///
     /// # Safety
     ///
     /// Requires kernel 5.19+. May fail with EINVAL on older kernels.
     /// Requires `IORING_REGISTER_PBUF_RING` setup.
-    pub fn prep_recv_multishot(&mut self, fd: RawFd, buf_group: u16, generation: u16) -> Result<()> {
+    pub fn prep_recv_multishot(
+        &mut self,
+        fd: RawFd,
+        buf_group: u16,
+        generation: u16,
+    ) -> Result<()> {
         let user_data = encode_user_data(fd, OpType::RecvMulti, generation);
 
         // Use RecvMulti opcode (usually Recv with MULTISHOT flag)
@@ -790,7 +802,7 @@ impl Ring {
     // SOTA 2025: Registered FD Table (IOSQE_FIXED_FILE)
     // =========================================================================
 
-    /// Register file descriptors for IOSQE_FIXED_FILE optimization.
+    /// Register file descriptors for `IOSQE_FIXED_FILE` optimization.
     ///
     /// After registration, use `prep_recv_fixed(fd_index, ...)` instead of raw FDs.
     /// This eliminates per-operation FD lookup overhead.
@@ -799,7 +811,7 @@ impl Ring {
             .submitter()
             .register_files(fds)
             .map_err(|e| Error::RingOp(format!("register_files failed: {e}")))?;
-        
+
         let capacity = fds.len().max(DEFAULT_RING_SIZE as usize) as u32;
         let table = FixedFdTable::init_from_slice(capacity, fds);
         self.registered_fds = Some(table);
@@ -827,13 +839,12 @@ impl Ring {
     // SOTA 2025: Zero-Copy Send (SEND_ZC)
     // =========================================================================
 
-    /// Prepare zero-copy send (kernel 6.0+).
-    ///
+    /// Requires kernel 6.0+.
     /// For large payloads, avoids copying data into kernel.
     ///
     /// # Safety
     ///
-    /// Buffer must remain valid until IORING_CQE_F_NOTIF completion.
+    /// Buffer must remain valid until `IORING_CQE_F_NOTIF` completion.
     pub unsafe fn prep_send_zc(
         &mut self,
         fd: RawFd,

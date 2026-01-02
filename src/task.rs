@@ -1,3 +1,7 @@
+// PyO3 naming conventions often trigger these
+#![allow(clippy::similar_names)]
+#![allow(clippy::doc_markdown)]
+
 use pyo3::exceptions::PyStopIteration;
 use pyo3::prelude::*;
 
@@ -14,8 +18,8 @@ pub struct UringTask {
     #[pyo3(get, set)]
     _log_destroy_pending: bool,
     // SOTA: Cached asyncio function references
-    enter_task_fn: PyObject,
-    leave_task_fn: PyObject,
+    _enter_task_fn: PyObject,
+    _leave_task_fn: PyObject,
 }
 
 use crate::future::{FutureState, UringFuture};
@@ -26,13 +30,15 @@ use std::sync::Arc;
 impl UringTask {
     /// The core step method (Native Rust version - OPTIMIZED).
     /// Removes _enter_task/_leave_task calls from hot path for performance.
-    pub fn run_step(&self, py: Python<'_>, slf: Py<Self>, scheduler: &crate::scheduler::Scheduler) -> PyResult<()> {
+    pub fn run_step(
+        &self,
+        py: Python<'_>,
+        slf: Py<Self>,
+        scheduler: &crate::scheduler::Scheduler,
+    ) -> PyResult<()> {
         let (coro, future) = {
             let refs = slf.borrow(py);
-            (
-                refs.coro.clone_ref(py),
-                refs.future.clone_ref(py),
-            )
+            (refs.coro.clone_ref(py), refs.future.clone_ref(py))
         };
 
         // Fast check using Python's done() - this is necessary
@@ -68,7 +74,7 @@ impl UringTask {
 
                     if matches!(*state_guard, FutureState::Pending) {
                         drop(state_guard);
-                        
+
                         // Native callback registration
                         let refs = uring_fut.borrow();
                         let state_guard = refs.state.lock();
@@ -123,12 +129,12 @@ impl UringTask {
         context: Option<PyObject>,
     ) -> PyResult<Self> {
         let future = loop_.call_method0(py, "create_future")?;
-        
+
         // SOTA: Cache asyncio.tasks functions once
         let asyncio_tasks = py.import("asyncio.tasks")?;
         let enter_task_fn = asyncio_tasks.getattr("_enter_task")?.into();
         let leave_task_fn = asyncio_tasks.getattr("_leave_task")?.into();
-        
+
         Ok(Self {
             coro,
             loop_,
@@ -137,8 +143,8 @@ impl UringTask {
             future,
             wakeup: Arc::new(Mutex::new(None)),
             _log_destroy_pending: true,
-            enter_task_fn,
-            leave_task_fn,
+            _enter_task_fn: enter_task_fn,
+            _leave_task_fn: leave_task_fn,
         })
     }
 
@@ -170,7 +176,6 @@ impl UringTask {
         value: Option<PyObject>,
         exc: Option<PyObject>,
     ) -> PyResult<()> {
-
         let (coro, loop_, future) = {
             let refs = slf.borrow(py);
             (

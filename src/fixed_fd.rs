@@ -7,7 +7,7 @@ use std::os::unix::io::RawFd;
 /// Handles allocation of free indices and tracking of registered files.
 #[derive(Debug)]
 pub struct FixedFdTable {
-    /// Mapping from RawFd to Fixed Index
+    /// Mapping from `RawFd` to Fixed Index
     index_map: HashMap<RawFd, u32>,
     /// The actual array of FDs (sparse, -1 for empty)
     /// This mirrors the kernel's registered files array.
@@ -20,12 +20,13 @@ impl FixedFdTable {
     /// Create a new table with a given capacity.
     ///
     /// The capacity determines the initial size of the registered files array.
+    #[must_use]
     pub fn new(capacity: u32) -> Self {
         let cap = capacity as usize;
         let mut files = Vec::with_capacity(cap);
         // Initialize with -1 (meaning no file)
         files.resize(cap, -1);
-        
+
         // All indices are initially free, pushing in reverse order so 0 is popped first
         let mut free_indices = Vec::with_capacity(cap);
         for i in (0..capacity).rev() {
@@ -38,13 +39,14 @@ impl FixedFdTable {
         }
     }
 
-    /// Initialize from a slice of FDs (e.g. from register_fds).
+    /// Initialize from a slice of FDs (e.g. from `register_fds`).
     /// Assumes indices 0..len are mapped to these FDs.
+    #[must_use]
     pub fn init_from_slice(capacity: u32, fds: &[RawFd]) -> Self {
         let cap = capacity as usize;
         let mut files = Vec::with_capacity(cap);
         files.resize(cap, -1);
-        
+
         let mut index_map = HashMap::new();
         // Populate with slice content
         for (i, &fd) in fds.iter().enumerate() {
@@ -63,7 +65,7 @@ impl FixedFdTable {
                 free_indices.push(i);
             }
         }
-        
+
         Self {
             index_map,
             files,
@@ -82,11 +84,11 @@ impl FixedFdTable {
 
         // Get a free index
         let idx = self.free_indices.pop()?;
-        
+
         // Store mapping
         self.index_map.insert(fd, idx);
         self.files[idx as usize] = fd;
-        
+
         Some(idx)
     }
 
@@ -102,11 +104,13 @@ impl FixedFdTable {
     }
 
     /// Get fixed index for an FD.
+    #[must_use]
     pub fn get_index(&self, fd: RawFd) -> Option<u32> {
         self.index_map.get(&fd).copied()
     }
-    
+
     /// Get the full files vector (for initial registration).
+    #[must_use]
     pub fn as_vec(&self) -> &Vec<RawFd> {
         &self.files
     }

@@ -43,20 +43,20 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         self._task_factory = None
 
         # Support environment variable configuration for buffer settings
-        # URINGCORE_BUFFER_COUNT: Number of buffers (default: 1024)
-        # URINGCORE_BUFFER_SIZE: Size of each buffer in bytes (default: 32768)
+        # URINGCORE_BUFFER_COUNT: Number of buffers (default: 4096)
+        # URINGCORE_BUFFER_SIZE: Size of each buffer in bytes (default: 8192)
         env_buffer_count = os.environ.get("URINGCORE_BUFFER_COUNT")
         env_buffer_size = os.environ.get("URINGCORE_BUFFER_SIZE")
 
         if env_buffer_count is not None:
             kwargs.setdefault("buffer_count", int(env_buffer_count))
         else:
-            kwargs.setdefault("buffer_count", 1024)
+            kwargs.setdefault("buffer_count", 4096)
 
         if env_buffer_size is not None:
             kwargs.setdefault("buffer_size", int(env_buffer_size))
         else:
-            kwargs.setdefault("buffer_size", 32768)
+            kwargs.setdefault("buffer_size", 8192)
 
         # Initialize the Rust core
         try:

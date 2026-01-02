@@ -129,7 +129,7 @@ impl UringCore {
     /// * `ring_size` - Size of the submission queue (default: 4096)
     /// * `try_sqpoll` - Whether to try SQPOLL mode (default: true)
     #[new]
-    #[pyo3(signature = (buffer_size=65536, buffer_count=4096, ring_size=4096, try_sqpoll=true))]
+    #[pyo3(signature = (buffer_size=8192, buffer_count=4096, ring_size=4096, try_sqpoll=true))]
     fn new(
         buffer_size: usize,
         buffer_count: usize,

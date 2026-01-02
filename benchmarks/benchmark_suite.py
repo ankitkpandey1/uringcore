@@ -348,9 +348,9 @@ def run_all_benchmarks() -> dict:
     try:
         from uringcore import UringCore
         
-        # Check env for override or use safe defaults for testing if tight
-        buffer_count = int(os.environ.get("URINGCORE_BUFFER_COUNT", 512))
-        buffer_size = int(os.environ.get("URINGCORE_BUFFER_SIZE", 32768))
+        # Check env for override or use defaults for high-throughput sock_pair benchmark
+        buffer_count = int(os.environ.get("URINGCORE_BUFFER_COUNT", 4096))
+        buffer_size = int(os.environ.get("URINGCORE_BUFFER_SIZE", 8192))
         
         # Initialize core (will raise helpful error if ENOMEM)
         core = UringCore(buffer_count=buffer_count, buffer_size=buffer_size)

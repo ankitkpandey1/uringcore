@@ -488,6 +488,43 @@ Expose runtime metrics (inflight buffers, queue lengths, completion latency, buf
 - Ring lock acquisitions merged (submit + drain_completions in single lock)
 - Python loop skips `epoll.poll` when ready tasks exist
 
+---
+
+## Performance Bottleneck Analysis (Phase 11)
+
+### The PyO3 Boundary Problem
+
+Despite optimizing Rust-side locking, `uringcore` remains 2-3x slower than `uvloop` for high-concurrency benchmarks. Analysis revealed:
+
+**Bottleneck: PyO3 Call Overhead in `run_step`**
+
+Each task step involves 8-12 Python⟷Rust boundary crossings:
+
+```
+coro.call_method1(py, "send", ...)      ~200ns
+leave_fn.call1(py, ...)                 ~200ns
+slf.getattr(py, "_wakeup")              ~150ns
+loop_.call_method(py, "call_soon", ...) ~200ns
+yielded.call_method1(py, ...)           ~200ns
+```
+
+**Total overhead**: ~500-1000ns per step × 100 tasks = **50-100µs per gather(100)**
+
+### Attempted Optimizations (No Improvement)
+
+| Optimization | Result |
+|--------------|--------|
+| AtomicU8 state flag | Locks weren't the issue |
+| Cached core reference | getattr wasn't the bottleneck |
+| Pre-allocated wakeup | Minimal impact |
+
+### Architecture Implication
+
+To match `uvloop`, uringcore would need:
+1. Move 90%+ of task stepping to pure Rust (no PyO3 method calls in hot path)
+2. Rust-native coroutine iteration without Python callbacks
+3. This is a fundamental architectural change
+
 ## Native Futures (Phase 5)
 
 Traditional `asyncio.Future` is implemented in Python (with a C accelerator). `uringcore` implements `UringFuture` entirely in Rust (`#[pyclass]`).

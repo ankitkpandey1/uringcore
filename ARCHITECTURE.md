@@ -532,14 +532,14 @@ The following state-of-the-art optimizations have been implemented or are availa
 | **Native Timers** (`IORING_OP_TIMEOUT`) | ✅ Available | 5.4+ |
 | **Multishot Recv** (`IORING_OP_RECV` + `RECV_MULTISHOT`) | ✅ Available | 5.19+ |
 | **Batch Drain Scheduler** | ✅ Active | N/A |
+| **Registered FD Table** (`IOSQE_FIXED_FILE`) | ✅ Available | 5.1+ |
+| **Zero-Copy Send** (`IORING_OP_SEND_ZC`) | ✅ Available | 6.0+ |
 
-### Available (Kernel Feature Detection)
+### Available (Runtime Feature Detection)
 
 | Optimization | API | Kernel Requirement |
 |--------------|-----|-------------------|
-| **Zero-Copy Send** | `prep_send_zc()` | 6.0+ |
 | **Provided Buffer Ring** | `REGISTER_PBUF_RING` | 5.19+ |
-| **Registered FDs** | `IOSQE_FIXED_FILE` | 5.1+ |
 
 ### Performance Results
 

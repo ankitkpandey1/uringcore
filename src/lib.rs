@@ -31,7 +31,7 @@
 //! asyncio.run(main())
 //! ```
 //!
-//! Copyright (c) 2025 Ankit Kumar Pandey <itsankitkp@gmail.com>
+//! Copyright (c) 2025 Ankit Kumar Pandey <ankitkpandey1@gmail.com>
 //! Licensed under the MIT License.
 
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
@@ -932,7 +932,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Add version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add("__author__", "Ankit Kumar Pandey <itsankitkp@gmail.com>")?;
+    m.add("__author__", "Ankit Kumar Pandey <ankitkpandey1@gmail.com>")?;
 
     Ok(())
 }

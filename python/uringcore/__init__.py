@@ -25,7 +25,7 @@ Environment Variables:
     URINGCORE_BUFFER_COUNT: Number of io_uring buffers (default: 512)
     URINGCORE_BUFFER_SIZE: Size of each buffer in bytes (default: 32768)
 
-Copyright (c) 2025 Ankit Kumar Pandey <itsankitkp@gmail.com>
+Copyright (c) 2025 Ankit Kumar Pandey <ankitkpandey1@gmail.com>
 Licensed under the Apache-2.0 License.
 """
 

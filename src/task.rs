@@ -207,6 +207,7 @@ impl UringTask {
         value: Option<PyObject>,
         exc: Option<PyObject>,
     ) -> PyResult<()> {
+
         let (coro, loop_, future) = {
             let refs = slf.borrow(py);
             (
@@ -222,11 +223,13 @@ impl UringTask {
 
         // Setup asyncio current_task context
         let asyncio_tasks = py.import("asyncio.tasks")?;
-        // _enter_task(loop, task)
         asyncio_tasks.call_method1("_enter_task", (loop_.clone_ref(py), slf.clone_ref(py)))?;
 
-        let result = if let Some(e) = exc {
-            coro.call_method1(py, "throw", (e,))
+        let result = if let Some(ref e) = exc {
+            // Python's generator.throw() expects (type, value, traceback)
+            let builtins = py.import("builtins")?;
+            let exc_type = builtins.call_method1("type", (e,))?;
+            coro.call_method1(py, "throw", (exc_type, e))
         } else {
             let arg = value.unwrap_or_else(|| py.None());
             coro.call_method1(py, "send", (arg,))
@@ -322,32 +325,12 @@ impl UringTask {
             return Ok(false);
         }
 
-        // Set a cancellation flag on the task?
-        // We lack a mutable field we can easily access without unsafe or Mutex.
-        // We can just rely on standard scheduling:
-        
         let loop_ = refs.loop_.clone_ref(py);
         drop(refs);
 
-        // Schedule _step with a special sentinel or just schedule it.
-        // If we want to inject CancelledError, it's safest to construct it INSIDE _step
-        // or let _step check a flag. But we don't have a flag.
-        
-        // Let's pass the exception CLASS, not instance, and let throw handle it?
-        // Or better: Let's use Future::cancel which sets state to Cancelled.
-        // BUT the user issue is that we need to allow suppression.
-        
-        // Alternative: Just schedule call_soon with the exception instance, 
-        // effectively what we did, but checking `coro.throw` logic.
-        
-        // The previous error was TypeError.
-        // Let's rely on Python side to construct the error?
-        // We can pass a string "cancel" to _step?
-        
-        // Let's try simpler path:
+        // Create CancelledError instance and schedule _step
         let asyncio = py.import("asyncio")?;
-        let exc = asyncio.getattr("CancelledError")?.call0()?; // Intance
-        
+        let exc = asyncio.getattr("CancelledError")?.call0()?;
         let step_cb = slf.getattr(py, "_step")?;
         loop_.call_method1(py, "call_soon", (step_cb, py.None(), exc))?;
 
@@ -364,6 +347,19 @@ impl UringTask {
 
     fn cancelled(&self, py: Python<'_>) -> PyResult<PyObject> {
         self.future.call_method0(py, "cancelled")
+    }
+
+    /// Returns the number of pending cancellation requests (Python 3.11+).
+    fn cancelling(&self, _py: Python<'_>) -> PyResult<i32> {
+        // For compatibility, return 0 (no pending cancellations)
+        // A full implementation would track nested cancel() calls
+        Ok(0)
+    }
+
+    /// Decrement the pending cancellation count (Python 3.11+).
+    fn uncancel(&self, _py: Python<'_>) -> PyResult<i32> {
+        // For compatibility, return 0
+        Ok(0)
     }
 
     fn exception(&self, py: Python<'_>) -> PyResult<PyObject> {

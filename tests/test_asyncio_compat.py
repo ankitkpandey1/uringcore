@@ -23,7 +23,7 @@ def event_loop():
     global _loop
     if _loop is None or _loop.is_closed():
         # Use the modern factory pattern (Python 3.11+)
-        _loop = uringcore.new_event_loop(buffer_count=16, buffer_size=4096)
+        _loop = uringcore.new_event_loop(buffer_count=512, buffer_size=4096)
     yield _loop
 
 

@@ -41,17 +41,15 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         self._task_factory = None
 
         # Support environment variable configuration for buffer settings
-        # URINGCORE_BUFFER_COUNT: Number of buffers (default: 512)
+        # URINGCORE_BUFFER_COUNT: Number of buffers (default: 1024)
         # URINGCORE_BUFFER_SIZE: Size of each buffer in bytes (default: 32768)
-        import os
-
         env_buffer_count = os.environ.get("URINGCORE_BUFFER_COUNT")
         env_buffer_size = os.environ.get("URINGCORE_BUFFER_SIZE")
 
         if env_buffer_count is not None:
             kwargs.setdefault("buffer_count", int(env_buffer_count))
         else:
-            kwargs.setdefault("buffer_count", 512)
+            kwargs.setdefault("buffer_count", 1024)
 
         if env_buffer_size is not None:
             kwargs.setdefault("buffer_size", int(env_buffer_size))
@@ -270,7 +268,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             if fd == self._core.event_fd:
                 # io_uring completion signal / wakeup
                 self._core.drain_eventfd()
-                self._process_completions()
+                # Completions processed by run_tick below
             else:
                 # Reader/writer callback
                 if event_mask & select.EPOLLIN and fd in self._readers:
@@ -284,7 +282,10 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
         # Run one tick of Rust scheduler (timers + ready queue)
         # Timeout handled by epoll above, so we pass 0.0 (non-blocking)
-        self._core.run_tick(0.0)
+        # Run one tick of Rust scheduler (timers + ready queue)
+        # Timeout handled by epoll above, so we pass 0.0 (non-blocking)
+        completions = self._core.run_tick(0.0)
+        self._process_completions(completions)
 
     def _calculate_timeout(self) -> float:
         """Calculate the timeout for the next poll."""
@@ -302,9 +303,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
         return 0.01
 
-    def _process_completions(self):
+    def _process_completions(self, completions):
         """Process completions from the io_uring ring."""
-        completions = self._core.drain_completions()
 
         for fd, op_type, result, data in completions:
             if op_type == "recv":
@@ -313,6 +313,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                 self._handle_send_completion(fd, result)
             elif op_type == "accept":
                 self._handle_accept_completion(fd, result)
+            elif op_type == "accept_multi":
+                self._handle_accept_multi_completion(fd, result)
             elif op_type == "close":
                 self._handle_close_completion(fd, result)
 
@@ -329,7 +331,11 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                 # Data received - deliver to protocol
                 transport._data_received(data)
                 # Rearm receive
-                self._core.submit_recv(fd)
+                # FIXME: submit_recv consumes data! Should use PollAdd for readiness.
+                # Passing dummy future to verify signature
+                fut = self.create_future()
+                self._io_futures[(fd, "recv")] = fut
+                self._core.submit_recv(fd, fut)
         elif result == 0:
             if fut is not None and not fut.done():
                 fut.set_result(b"")
@@ -397,11 +403,37 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                 server, protocol_factory = self._servers[fd]  # Already retrieved
                 self._create_transport_for_accepted(client_fd, protocol_factory)
                 # Rearm accept for server
-                self._core.submit_accept(fd)
+                fut = self.create_future()
+                self._io_futures[(fd, "accept")] = fut
+                self._core.submit_accept(fd, fut)
         else:
             if fut is not None and not fut.done():
 
                 fut.set_exception(OSError(-result, os.strerror(-result)))
+
+    def _handle_accept_multi_completion(self, fd: int, result: int):
+        """Handle a multishot accept completion."""
+        # print(f"DEBUG: AcceptMulti completion fd={fd} result={result}")
+        if result >= 0:
+            # New connection accepted
+            if self._servers.get(fd):
+                client_fd = result
+                server, protocol_factory = self._servers[fd]
+                try:
+                   self._create_transport_for_accepted(client_fd, protocol_factory)
+                except Exception:
+                    # Error creating transport, close FD
+                    try:
+                        os.close(client_fd)
+                    except OSError:
+                        pass
+        else:
+            # Error handling
+            print(f"ERROR: AcceptMulti failed with result={result}")
+            if result == -125: # ECANCELED
+                return
+            # Log other errors?
+            pass
 
     def _handle_close_completion(self, fd: int, result: int):
         """Handle a close completion."""
@@ -425,11 +457,9 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Notify protocol
         protocol.connection_made(transport)
 
-        # Start receiving
+        # Register FD and start receiving
         self._core.register_fd(fd, "tcp")
-        # transport.resume_reading() logic includes rearm_recv
-        transport.resume_reading()
-        # Initial submission is done via resume_reading -> _rearm_recv
+        transport._rearm_recv()
 
     # Removed _process_scheduled as it is handled by Rust run_tick
 
@@ -674,8 +704,10 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         fut = self.create_future()
         self._io_futures[(fd, "accept")] = fut
 
-        self._core.submit_accept(fd)
-        return cast(tuple[socket.socket, Any], await fut)
+        self._core.submit_accept(fd, fut)
+        conn, addr = await fut
+        conn.setblocking(False)
+        return conn, addr
 
     async def sock_connect(self, sock: socket.socket, address: Any) -> None:
         # TODO: Implement using io_uring (need submit_connect)
@@ -695,7 +727,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         fut = self.create_future()
         self._io_futures[(fd, "recv")] = fut
 
-        self._core.submit_recv(fd)
+        self._core.submit_recv(fd, fut)
         return cast(bytes, await fut)
 
     async def sock_sendall(self, sock: socket.socket, data: Any) -> None:
@@ -722,7 +754,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         else:
             raise TypeError("data argument must be byte-ish")
 
-        self._core.submit_send(fd, bdata)
+        self._core.submit_send(fd, bdata, fut)
         await fut
 
     async def sendfile(
@@ -899,7 +931,9 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             self._core.register_fd(fd, "tcp_listener")
             self._servers[fd] = (server, protocol_factory)
             if start_serving:
-                self._core.submit_accept(fd)
+                fut = self.create_future()
+                self._io_futures[(fd, "accept")] = fut
+                self._core.submit_accept(fd, fut)
 
         return server
 
@@ -1142,7 +1176,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Register and start receiving
         self._core.register_fd(fd, "tcp")
         protocol.connection_made(transport)
-        transport.resume_reading()
+        transport._rearm_recv()
 
         return transport, protocol
 

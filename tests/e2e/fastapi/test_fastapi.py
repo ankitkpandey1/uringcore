@@ -4,7 +4,7 @@ import asyncio
 import pytest
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 from pydantic import BaseModel
 
 
@@ -74,110 +74,113 @@ async def error_endpoint():
     raise HTTPException(status_code=500, detail="Intentional error")
 
 
+@pytest.mark.asyncio
 class TestFastAPIBasic:
     """Basic FastAPI integration tests."""
 
-    def test_root(self):
+    async def test_root(self):
         """Test root endpoint."""
-        client = TestClient(app)
-        response = client.get("/")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == "Hello from FastAPI!"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["message"] == "Hello from FastAPI!"
 
-    def test_health(self):
+    async def test_health(self):
         """Test health check endpoint."""
-        client = TestClient(app)
-        response = client.get("/health")
-        assert response.status_code == 200
-        assert response.json()["status"] == "healthy"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/health")
+            assert response.status_code == 200
+            assert response.json()["status"] == "healthy"
 
-    def test_async_endpoint(self):
+    async def test_async_endpoint(self):
         """Test async endpoint."""
-        client = TestClient(app)
-        response = client.get("/async")
-        assert response.status_code == 200
-        assert response.json()["async"] is True
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/async")
+            assert response.status_code == 200
+            assert response.json()["async"] is True
 
-    def test_path_parameter(self):
+    async def test_path_parameter(self):
         """Test path parameters."""
-        client = TestClient(app)
-        response = client.get("/items/42")
-        assert response.status_code == 200
-        assert response.json()["item_id"] == 42
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/items/42")
+            assert response.status_code == 200
+            assert response.json()["item_id"] == 42
 
-    def test_query_parameter(self):
+    async def test_query_parameter(self):
         """Test query parameters."""
-        client = TestClient(app)
-        response = client.get("/items/42?q=test")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["item_id"] == 42
-        assert data["query"] == "test"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/items/42?q=test")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["item_id"] == 42
+            assert data["query"] == "test"
 
 
+@pytest.mark.asyncio
 class TestFastAPIEcho:
     """Echo endpoint tests."""
 
-    def test_echo_json(self):
+    async def test_echo_json(self):
         """Test JSON echo endpoint."""
-        client = TestClient(app)
-        response = client.post("/echo", json={"message": "Hello", "count": 3})
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == "Hello"
-        assert data["repeated"] == ["Hello", "Hello", "Hello"]
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/echo", json={"message": "Hello", "count": 3})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["message"] == "Hello"
+            assert data["repeated"] == ["Hello", "Hello", "Hello"]
 
-    def test_echo_raw(self):
+    async def test_echo_raw(self):
         """Test raw echo endpoint."""
-        client = TestClient(app)
-        response = client.post("/echo/raw", content="Raw content")
-        assert response.status_code == 200
-        assert response.text == "Raw content"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/echo/raw", content="Raw content")
+            assert response.status_code == 200
+            assert response.text == "Raw content"
 
-    def test_echo_validation_error(self):
+    async def test_echo_validation_error(self):
         """Test validation error handling."""
-        client = TestClient(app)
-        response = client.post("/echo", json={"invalid": "data"})
-        assert response.status_code == 422  # Validation error
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/echo", json={"invalid": "data"})
+            assert response.status_code == 422  # Validation error
 
 
+@pytest.mark.asyncio
 class TestFastAPIErrors:
     """Error handling tests."""
 
-    def test_not_found(self):
+    async def test_not_found(self):
         """Test 404 response."""
-        client = TestClient(app)
-        response = client.get("/nonexistent")
-        assert response.status_code == 404
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/nonexistent")
+            assert response.status_code == 404
 
-    def test_internal_error(self):
+    async def test_internal_error(self):
         """Test 500 response."""
-        client = TestClient(app)
-        response = client.get("/error")
-        assert response.status_code == 500
-        assert response.json()["detail"] == "Intentional error"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/error")
+            assert response.status_code == 500
+            assert response.json()["detail"] == "Intentional error"
 
 
+@pytest.mark.asyncio
 class TestFastAPIConcurrency:
     """Concurrency tests for FastAPI."""
 
-    def test_multiple_requests(self):
+    async def test_multiple_requests(self):
         """Test multiple sequential requests."""
-        client = TestClient(app)
-        for i in range(20):
-            response = client.get("/health")
-            assert response.status_code == 200
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            for i in range(20):
+                response = await client.get("/health")
+                assert response.status_code == 200
 
-    def test_large_payload(self):
+    async def test_large_payload(self):
         """Test with larger payload."""
-        client = TestClient(app)
-        payload = "x" * 50000
-        response = client.post("/echo/raw", content=payload)
-        assert response.status_code == 200
-        assert len(response.text) == 50000
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = "x" * 50000
+            response = await client.post("/echo/raw", content=payload)
+            assert response.status_code == 200
+            assert len(response.text) == 50000
 
-    @pytest.mark.asyncio
     async def test_concurrent_async_tasks(self):
         """Test concurrent async operations."""
         async def make_request():
@@ -189,19 +192,21 @@ class TestFastAPIConcurrency:
         assert all(results)
 
 
+@pytest.mark.asyncio
 class TestFastAPIWithUringloop:
     """Tests specifically for uringcore integration."""
 
-    def test_openapi_schema(self):
+    async def test_openapi_schema(self):
         """Test OpenAPI schema generation."""
-        client = TestClient(app)
-        response = client.get("/openapi.json")
-        assert response.status_code == 200
-        schema = response.json()
-        assert schema["info"]["title"] == "uringcore E2E Test"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/openapi.json")
+            assert response.status_code == 200
+            schema = response.json()
+            assert schema["info"]["title"] == "uringcore E2E Test"
 
-    def test_docs_available(self):
+    async def test_docs_available(self):
         """Test docs endpoint."""
-        client = TestClient(app)
-        response = client.get("/docs")
-        assert response.status_code == 200
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/docs")
+            assert response.status_code == 200
+

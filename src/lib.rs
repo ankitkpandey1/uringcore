@@ -54,6 +54,8 @@
 #![allow(clippy::unused_self)]
 
 pub mod buffer;
+pub mod buf_ring;
+pub mod fixed_fd;
 pub mod error;
 pub mod future;
 pub mod handle;
@@ -94,6 +96,8 @@ pub struct UringCore {
     scheduler: Scheduler,
     /// Future map for Native Completion (FD -> Future)
     futures: Mutex<HashMap<i32, PyObject>>,
+    /// Provided Buffer Ring (SOTA)
+    pbuf_ring: Option<Arc<buf_ring::PBufRing>>,
 }
 
 #[pymethods]
@@ -102,43 +106,76 @@ impl UringCore {
     ///
     /// # Arguments
     ///
-    /// * `ring_size` - Size of the submission queue (default: 4096)
-    /// * `buffer_size` - Size of each buffer in bytes (default: 64KB)
     /// * `buffer_count` - Number of buffers to allocate (default: 1024)
+    /// * `ring_size` - Size of the submission queue (default: 4096)
     /// * `try_sqpoll` - Whether to try SQPOLL mode (default: true)
     #[new]
-    #[pyo3(signature = (ring_size=None, buffer_size=None, buffer_count=None, try_sqpoll=None))]
+    #[pyo3(signature = (buffer_size=65536, buffer_count=1024, ring_size=4096, try_sqpoll=true))]
     fn new(
-        ring_size: Option<u32>,
-        buffer_size: Option<usize>,
-        buffer_count: Option<usize>,
-        try_sqpoll: Option<bool>,
+        buffer_size: usize,
+        buffer_count: usize,
+        ring_size: u32,
+        try_sqpoll: bool,
     ) -> PyResult<Self> {
-        let ring_size = ring_size.unwrap_or(ring::DEFAULT_RING_SIZE);
-        let buffer_size = buffer_size.unwrap_or(buffer::DEFAULT_BUFFER_SIZE);
-        let buffer_count = buffer_count.unwrap_or(buffer::DEFAULT_BUFFER_COUNT);
-        let try_sqpoll = try_sqpoll.unwrap_or(true);
-
-        let buffer_pool = Arc::new(
-            BufferPool::new(buffer_size, buffer_count)
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?,
-        );
-
         let mut ring = Ring::new(ring_size, try_sqpoll)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
-        // Register buffers with the ring
-        ring.register_buffers(Arc::clone(&buffer_pool))
+        // Initialize buffer pool (mmap)
+        let pool = Arc::new(
+            BufferPool::new(buffer_size, buffer_count)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyMemoryError, _>(e.to_string()))?,
+        );
+
+        // Register buffers with io_uring (Fixed Buffers)
+        ring.register_buffers(pool.clone())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        // Try to set up Provided Buffer Ring (SOTA Phase 7) if supported
+        let mut pbuf_ring = None;
+        // Use BGID 1 for the default group
+        let bgid = 1;
+        // Ring entries must be power of 2. Round up buffer_count to next power of 2.
+        let pbuf_entries = buffer_count.next_power_of_two() as u16; 
+        
+        // Attempt to create and register PBufRing
+        if let Ok(pr) = buf_ring::PBufRing::new(pbuf_entries, bgid) {
+            // Unsafe: Getting pointers for registration
+            let addr = pr.as_ptr() as u64;
+            
+            // Try registration
+            // SAFETY: addr is valid execution of PBufRing::new ensured valid layout
+            if unsafe { ring.register_pbuf_ring(addr, pbuf_entries, bgid).is_ok() } {
+                tracing::info!("PBufRing registered with {} entries (BGID {})", pbuf_entries, bgid);
+                
+                // Populate the ring with buffers from the pool
+                // We map buffer index 0..buffer_count to the ring
+                // The BufferPool owns the memory, PBufRing just indexes it for the kernel
+                
+                let pool_ref = &pool; // borrow for closure
+                
+                pr.add_buffers(buffer_count as u16, |i| {
+                     // SAFETY: i < buffer_count is guaranteed by loop bound
+                     let addr = unsafe { pool_ref.get_buffer_ptr(i) } as u64;
+                     let len = buffer_size as u32; // pool.buffer_size()
+                     let bid = i; // Buffer ID matches pool index
+                     (addr, len, bid)
+                });
+                
+                pbuf_ring = Some(Arc::new(pr));
+            } else {
+                tracing::debug!("PBufRing registration failed (kernel too old?), skipping.");
+            }
+        }
 
         Ok(Self {
             ring: Mutex::new(ring),
-            buffer_pool,
+            buffer_pool: pool,
             fd_states: FDStateManager::new(),
             inflight_recv_buffers: Mutex::new(HashMap::new()),
             timers: TimerHeap::new(),
             scheduler: Scheduler::new(),
             futures: Mutex::new(HashMap::new()),
+            pbuf_ring,
         })
     }
 
@@ -243,6 +280,7 @@ impl UringCore {
                 OpType::Timeout => "timeout",
                 OpType::RecvMulti => "recv_multi",
                 OpType::SendZC => "send_zc",
+                OpType::AcceptMulti => "accept_multi",
                 OpType::Unknown => "unknown",
             };
 
@@ -339,6 +377,24 @@ impl UringCore {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
+    /// Register a file descriptor for fixed file optimization (SOTA Phase 8).
+    ///
+    /// Returns the fixed index.
+    fn register_file(&self, fd: i32) -> PyResult<u32> {
+        self.ring
+            .lock()
+            .register_file(fd)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Unregister a file descriptor.
+    fn unregister_file(&self, fd: i32) -> PyResult<()> {
+        self.ring
+            .lock()
+            .unregister_file(fd)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
     // =========================================================================
     // io_uring Submission Methods (Pure Async I/O)
     // =========================================================================
@@ -403,6 +459,38 @@ impl UringCore {
         Ok(())
     }
 
+    /// Submit a multishot receive operation using provided buffers.
+    ///
+    /// Requires Provided Buffer Ring (Phase 7).
+    fn submit_recv_multishot(&self, fd: i32, future: PyObject) -> PyResult<()> {
+        let bgid = if let Some(ref pr) = self.pbuf_ring {
+            pr.bgid()
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Provided Buffer Ring not available (kernel < 5.19 or not initialized)",
+            ));
+        };
+
+        let gen = self.ring.lock().generation_u16();
+        
+        // Register future
+        self.futures.lock().insert(fd, future);
+        // Note: No specific buffer_index to track inflight, kernel provides it on completion.
+        
+        self.ring
+            .lock()
+            .prep_recv_multishot(fd, bgid, gen)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        // Submit immediately
+        self.ring
+            .lock()
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
     /// Submit a send operation for a file descriptor.
     ///
     /// The data is copied to a buffer and submitted to `io_uring`.
@@ -451,14 +539,53 @@ impl UringCore {
     /// Submit an accept operation for a listening socket.
     ///
     /// Uses `ACCEPT_MULTI` for efficient connection handling.
-    fn submit_accept(&self, fd: i32) -> PyResult<()> {
+    /// Submit an accept operation for a listening socket.
+    ///
+    /// Uses `ACCEPT_MULTI` for efficient connection handling.
+    fn submit_accept(&self, fd: i32, future: PyObject) -> PyResult<()> {
         let gen = self.ring.lock().generation_u16();
+        
+        self.futures.lock().insert(fd, future);
+        
         self.ring
             .lock()
             .prep_accept(fd, gen)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            .map_err(|e| {
+                self.futures.lock().remove(&fd);
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+            })?;
 
         // Flush to kernel
+        self.ring
+            .lock()
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Submit a multishot accept operation.
+    #[pyo3(signature = (fd))]
+    fn submit_accept_multishot(&self, fd: i32) -> PyResult<()> {
+        let gen = self.ring.lock().generation_u16();
+
+        // Note: We don't track a future for multishot accept because it
+        // produces a stream of events. The Python loop handles dispatch.
+        
+        // We use insert to mark that we accept completions for this FD
+        // but we don't store a Python future because one doesn't exist yet.
+        // We can store None? No, futures map expects PyObject.
+        // Actually, we probably don't need to put anything in futures map if
+        // run_tick logic works for AcceptMulti (OpType::AcceptMulti).
+        // run_tick just returns (fd, op, res, data). It doesn't NEED to find a future.
+        // It tries to resolve it if found, but if not found, it still adds to results list.
+        // So we just submit and let run_tick return the event.
+
+        self.ring
+            .lock()
+            .prep_accept_multishot(fd, gen)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
         self.ring
             .lock()
             .submit()
@@ -530,9 +657,12 @@ impl UringCore {
     /// 2. Submits/Polls I/O -> processes completions (callbacks)
     /// 3. Executes ready tasks
     #[pyo3(signature = (timeout=None))]
-    fn run_tick(&self, py: Python<'_>, timeout: Option<f64>) -> PyResult<usize> {
+    #[allow(unused_variables)]
+    fn run_tick(&self, py: Python<'_>, timeout: Option<f64>) -> PyResult<Vec<PyObject>> {
+        let mut results = Vec::new();
+
         // 1. Process Timers (Native)
-        let n_timers = {
+        let _n_timers = {
             let mut ts = libc::timespec {
                 tv_sec: 0,
                 tv_nsec: 0,
@@ -557,19 +687,29 @@ impl UringCore {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         // 3. Process Completions (Native Phase 4)
-        let mut completed_io = 0;
         {
             let mut ring = self.ring.lock();
             let completions = ring.drain_completions();
 
             for cqe in completions {
-                completed_io += 1;
                 let fd = cqe.fd();
                 let result = cqe.result;
                 let op_type_str = cqe.op_type();
 
                 // Handle buffer release for recv / data extraction
                 let mut data_bytes: Option<PyObject> = None;
+
+                if matches!(op_type_str, OpType::RecvMulti) {
+                    if let Some(buf_idx) = cqe.buffer_index {
+                        if result > 0 {
+                            let len = result as usize;
+                            unsafe {
+                                let slice = self.buffer_pool.get_buffer_slice(buf_idx, len);
+                                data_bytes = Some(pyo3::types::PyBytes::new(py, slice).into());
+                            }
+                        }
+                    }
+                }
 
                 if matches!(op_type_str, OpType::Recv) {
                     let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
@@ -587,6 +727,9 @@ impl UringCore {
                             .release(buf_idx, self.buffer_pool.generation_id());
                     }
                 }
+
+                // Clone data for return value (Python tuple) BEFORE consuming data_bytes in future resolution
+                let data_for_tuple = data_bytes.as_ref().map(|p| p.clone_ref(py));
 
                 // Resolve Future
                 let future_opt = self.futures.lock().remove(&fd);
@@ -617,7 +760,7 @@ impl UringCore {
                         }
                     } else {
                         // Success
-                        if matches!(op_type_str, OpType::Recv) {
+                        if matches!(op_type_str, OpType::Recv) || matches!(op_type_str, OpType::RecvMulti) {
                             if let Some(bytes) = data_bytes {
                                 if let Ok(uring_fut) =
                                     future.downcast_bound::<crate::future::UringFuture>(py)
@@ -675,14 +818,19 @@ impl UringCore {
                             }
                         }
                     }
-                }
+                        }
+            
+                // Add to results list for Python side processing (even if future resolved)
+                let data_obj = data_for_tuple.unwrap_or_else(|| py.None());
+                let op_str = op_type_str.as_str();
+                let tuple = (fd, op_str, result, data_obj).into_pyobject(py)?;
+                results.push(tuple.into());
             }
         }
 
         // 4. Run ready tasks (BATCH DRAIN for performance)
         let ready_batch = self.scheduler.drain();
-        let mut executed = 0;
-
+        
         for handle in ready_batch {
             if let Ok(task) = handle.downcast_bound::<task::UringTask>(py) {
                 // Fast path: UringTask (most common in gather)
@@ -690,20 +838,21 @@ impl UringCore {
                     e.print(py);
                 }
             } else if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
-                let refs = uring_handle.borrow();
-                if let Err(e) = refs.execute(py) {
+                // Execute timer callback
+                // asyncio.TimerHandle._run() executes the callback
+                if let Err(e) = uring_handle.borrow().execute(py) {
                     e.print(py);
                 }
             } else {
-                // Fallback for generic Python callables
-                if let Err(e) = handle.bind(py).call_method0("_run") {
+                // Should not happen for timers from our own loop
+                // but handle generic PyObject just in case
+                if let Err(e) = handle.call_method0(py, "_run") {
                     e.print(py);
                 }
             }
-            executed += 1;
         }
 
-        Ok(n_timers + completed_io + executed)
+        Ok(results)
     }
 }
 

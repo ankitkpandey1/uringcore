@@ -29,6 +29,7 @@ class SubprocessTransport(asyncio.SubprocessTransport):
         self._pid = proc.pid
         self._returncode: Optional[int] = None
         self._closed = False
+        self._exit_waiters: list = []  # Futures waiting for process exit
 
         # Pipe transports: fd -> ReadPipeTransport/WritePipeTransport
         self._pipes: Dict[
@@ -88,6 +89,11 @@ class SubprocessTransport(asyncio.SubprocessTransport):
         except Exception:
             pass
 
+        # Notify any waiters
+        for waiter in self._exit_waiters:
+            if not waiter.done():
+                waiter.set_result(returncode)
+
     def get_pid(self) -> int:
         """Return the subprocess process ID."""
         return self._pid
@@ -95,6 +101,23 @@ class SubprocessTransport(asyncio.SubprocessTransport):
     def get_returncode(self) -> Optional[int]:
         """Return the subprocess return code or None."""
         return self._returncode
+
+    @property
+    def returncode(self) -> Optional[int]:
+        """Return code property for asyncio compatibility."""
+        return self._returncode
+
+    async def _wait(self) -> int:
+        """Wait for the process to exit and return the return code."""
+        if self._returncode is not None:
+            return self._returncode
+        
+        waiter = self._loop.create_future()
+        self._exit_waiters.append(waiter)
+        try:
+            return await waiter
+        finally:
+            self._exit_waiters.remove(waiter)
 
     def get_pipe_transport(self, fd: int) -> Optional[asyncio.BaseTransport]:
         """Return the transport for the pipe with file descriptor fd."""

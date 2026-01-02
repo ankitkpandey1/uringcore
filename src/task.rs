@@ -1,12 +1,12 @@
 use pyo3::exceptions::PyStopIteration;
 use pyo3::prelude::*;
 
-#[pyclass(module = "uringcore")]
+#[pyclass(module = "uringcore", weakref)]
 pub struct UringTask {
     coro: PyObject,
     loop_: PyObject,
     #[allow(dead_code)]
-    name: Option<String>,
+    name: Mutex<Option<String>>,
     #[allow(dead_code)]
     context: Option<PyObject>,
     future: PyObject,
@@ -43,7 +43,7 @@ impl UringTask {
         Ok(Self {
             coro,
             loop_,
-            name,
+            name: Mutex::new(name),
             context,
             future,
             wakeup: Arc::new(Mutex::new(None)),
@@ -164,7 +164,7 @@ impl UringTask {
 
                         let refs = slf.borrow(py);
                         let kwargs = if let Some(ctx) = refs.context.as_ref() {
-                            let d = pyo3::types::PyDict::new_bound(py);
+                            let d = pyo3::types::PyDict::new(py);
                             d.set_item("context", ctx)?;
                             Some(d)
                         } else {
@@ -387,6 +387,22 @@ impl UringTask {
     }
 
     fn get_loop(&self, py: Python<'_>) -> PyResult<PyObject> {
+        Ok(self.loop_.clone_ref(py))
+    }
+
+    fn get_name(&self, _py: Python<'_>) -> PyResult<String> {
+        let guard = self.name.lock();
+        Ok(guard.clone().unwrap_or_else(|| "Task".to_string()))
+    }
+
+    fn set_name(&self, name: String) -> PyResult<()> {
+        let mut guard = self.name.lock();
+        *guard = Some(name);
+        Ok(())
+    }
+
+    #[getter]
+    fn _loop(&self, py: Python<'_>) -> PyResult<PyObject> {
         Ok(self.loop_.clone_ref(py))
     }
 }

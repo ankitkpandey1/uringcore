@@ -22,7 +22,7 @@ pub const DEFAULT_BUFFER_SIZE: usize = 64 * 1024;
 pub const DEFAULT_BUFFER_COUNT: usize = 1024;
 
 /// Quarantine duration before buffer reuse (reduced for high throughput)
-const QUARANTINE_DURATION: Duration = Duration::from_millis(1);
+const QUARANTINE_DURATION: Duration = Duration::from_micros(1);
 
 /// A reference to a buffer in the pool with offset tracking for partial reads.
 #[derive(Debug)]

@@ -551,6 +551,115 @@ def generate_charts(results: dict, output_dir: Optional[Path] = None):
         plt.close()
 
 
+# Check for Plotly
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    print("Note: plotly not available, skipping interactive charts")
+
+
+def generate_plotly_charts(results: dict, output_dir: Optional[Path] = None):
+    """Generate interactive charts using Plotly."""
+    if not PLOTLY_AVAILABLE:
+        return
+
+    if output_dir is None:
+        output_dir = Path(__file__).parent / "results"
+
+    benchmarks = results.get("benchmarks", {})
+    if not benchmarks:
+        return
+
+    loops = list(benchmarks.keys())
+    first_loop = loops[0]
+    bench_names = [b["name"] for b in benchmarks[first_loop]]
+    
+    # Define colors
+    colors = {"asyncio": "#3498db", "uvloop": "#2ecc71", "uringcore": "#e74c3c"}
+
+    # Create subplot figure
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=("Operation Latency (lower is better)", "Speedup vs asyncio (higher is better)"),
+        vertical_spacing=0.15
+    )
+
+    # 1. Latency Bar Chart
+    for loop in loops:
+        times = []
+        for b in benchmarks[loop]:
+            times.append(b["avg_time_us"])
+        
+        fig.add_trace(
+            go.Bar(name=loop, x=bench_names, y=times, marker_color=colors.get(loop, "gray")),
+            row=1, col=1
+        )
+
+    # 2. Speedup Chart (if comparison possible)
+    if len(loops) > 1 and "asyncio" in loops:
+        for loop in loops:
+            if loop == "asyncio":
+                continue
+            
+            speedups = []
+            for bench_name in bench_names:
+                asyncio_time = next((b["avg_time_us"] for b in benchmarks["asyncio"] if b["name"] == bench_name), None)
+                loop_time = next((b["avg_time_us"] for b in benchmarks[loop] if b["name"] == bench_name), None)
+                
+                if asyncio_time and loop_time and loop_time > 0:
+                    speedups.append(asyncio_time / loop_time)
+                else:
+                    speedups.append(1.0)
+            
+            fig.add_trace(
+                go.Bar(
+                    name=f"{loop} speedup", 
+                    x=bench_names, 
+                    y=speedups, 
+                    marker_color=colors.get(loop, "gray"),
+                    showlegend=True
+                ),
+                row=2, col=1
+            )
+        
+        # Add baseline line
+        fig.add_shape(
+            type="line", line=dict(dash="dash", width=1, color="gray"),
+            x0=-0.5, x1=len(bench_names)-0.5, y0=1, y1=1,
+            row=2, col=1
+        )
+
+    # Update layout
+    fig.update_layout(
+        title_text=f"Event Loop Performance: uringcore vs others ({sys.platform})",
+        height=900,
+        showlegend=True,
+        barmode='group',
+        template="plotly_white"
+    )
+    
+    # Update axes
+    fig.update_yaxes(title_text="Time (µs)", row=1, col=1)
+    fig.update_yaxes(title_text="Speedup Factor (x)", row=2, col=1)
+    fig.update_xaxes(tickangle=45, row=2, col=1)
+
+    # Save to HTML
+    html_path = output_dir / "benchmark_report.html"
+    fig.write_html(str(html_path))
+    print(f"Interactive report saved to {html_path}")
+
+    # Save to PNG (for BENCHMARK.md)
+    try:
+        png_path = output_dir / "benchmark_chart.png"
+        fig.write_image(str(png_path), scale=2)
+        print(f"Static chart saved to {png_path}")
+    except Exception as e:
+        print(f"Failed to save static chart (requires kaleido): {e}")
+
+
 def main():
     """Main entry point."""
     print("=" * 60)
@@ -571,6 +680,7 @@ def main():
     
     # Generate charts
     generate_charts(results, output_dir)
+    generate_plotly_charts(results, output_dir)
     
     print("\nBenchmark complete!")
 

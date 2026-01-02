@@ -28,6 +28,7 @@ class UringSocketTransport(asyncio.Transport):
         self._write_buffer = bytearray()
         self._write_buffer_size = 0
         self._paused = False
+        self._recv_pending = False  # Track if recv is in flight
         self._high_water = 64 * 1024  # 64KB
         self._low_water = 16 * 1024  # 16KB
 
@@ -73,27 +74,31 @@ class UringSocketTransport(asyncio.Transport):
 
     def resume_reading(self):
         """Resume the receiving end."""
-        if self._closing or not self._paused:
+        if self._closing:
             return
-        self._paused = False
-        self._loop._core.resume_reading(self._fd)
-        # Rearm receive
+        if self._paused:
+            self._paused = False
+            self._loop._core.resume_reading(self._fd)
+        # Always rearm receive when resuming or starting
         self._rearm_recv()
 
     def _rearm_recv(self):
         """Submit a receive operation."""
-        if self._closing or self._paused:
+        if self._closing or self._paused or self._recv_pending:
             return
             
         try:
+            self._recv_pending = True
             fut = self._loop.create_future()
             fut.add_done_callback(self._on_recv_complete)
             self._loop._core.submit_recv(self._fd, fut)
         except Exception as exc:
+            self._recv_pending = False
             self._error_received(exc)
 
     def _on_recv_complete(self, fut):
         """Handle receive completion."""
+        self._recv_pending = False
         if self._closing:
             return
             

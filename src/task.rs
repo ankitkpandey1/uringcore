@@ -22,6 +22,95 @@ use crate::future::{FutureState, UringFuture};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+/// Internal methods for UringTask (not exposed to Python)
+impl UringTask {
+    /// The core step method (Native Rust version - OPTIMIZED).
+    /// Removes _enter_task/_leave_task calls from hot path for performance.
+    pub fn run_step(&self, py: Python<'_>, slf: Py<Self>, scheduler: &crate::scheduler::Scheduler) -> PyResult<()> {
+        let (coro, future) = {
+            let refs = slf.borrow(py);
+            (
+                refs.coro.clone_ref(py),
+                refs.future.clone_ref(py),
+            )
+        };
+
+        // Fast check using Python's done() - this is necessary
+        if future.call_method0(py, "done")?.is_truthy(py)? {
+            return Ok(());
+        }
+
+        // Step the coroutine directly (NO _enter_task/_leave_task)
+        let result = coro.call_method1(py, "send", (py.None(),));
+
+        // Inline helper to get or create wakeup
+        let get_wakeup = || -> PyResult<PyObject> {
+            {
+                let refs = slf.borrow(py);
+                let w = refs.wakeup.lock();
+                if let Some(ref obj) = *w {
+                    return Ok(obj.clone_ref(py));
+                }
+            }
+            let obj = slf.getattr(py, "_wakeup")?;
+            let refs = slf.borrow(py);
+            let mut w = refs.wakeup.lock();
+            *w = Some(obj.clone_ref(py));
+            Ok(obj)
+        };
+
+        match result {
+            Ok(yielded) => {
+                // Optimization: Check if yielded is our native UringFuture
+                if let Ok(uring_fut) = yielded.downcast_bound::<UringFuture>(py) {
+                    let refs = uring_fut.borrow();
+                    let state_guard = refs.state.lock();
+
+                    if matches!(*state_guard, FutureState::Pending) {
+                        drop(state_guard);
+                        
+                        // Native callback registration
+                        let refs = uring_fut.borrow();
+                        let state_guard = refs.state.lock();
+                        if matches!(*state_guard, FutureState::Pending) {
+                            let wakeup = get_wakeup()?;
+                            let mut cb_guard = refs.callbacks.lock();
+                            cb_guard.push((wakeup, None));
+                        } else {
+                            // Future finished - reschedule immediately via scheduler
+                            drop(state_guard);
+                            scheduler.push(slf.into_any());
+                        }
+                    } else {
+                        // Already done - reschedule to collect result
+                        drop(state_guard);
+                        scheduler.push(slf.into_any());
+                    }
+                } else if yielded.is_none(py) {
+                    // Task yielded None (e.g. sleep(0)). Re-schedule immediately via scheduler.
+                    scheduler.push(slf.into_any());
+                } else {
+                    // Generic awaitable - use Python add_done_callback
+                    let wakeup = get_wakeup()?;
+                    yielded.call_method1(py, "add_done_callback", (wakeup,))?;
+                }
+            }
+            Err(e) => {
+                if e.is_instance_of::<PyStopIteration>(py) {
+                    let value = e.value(py);
+                    let ret_val = value
+                        .getattr("value")
+                        .map_or_else(|_| py.None(), std::convert::Into::into);
+                    future.call_method1(py, "set_result", (ret_val,))?;
+                } else {
+                    future.call_method1(py, "set_exception", (e,))?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[pymethods]
 impl UringTask {
     #[new]
@@ -69,132 +158,6 @@ impl UringTask {
 
         let step_cb = slf.getattr(py, "_step")?;
         loop_.call_method(py, "call_soon", (step_cb,), kwargs.as_ref())?;
-        Ok(())
-    }
-
-    /// The core step method (Native Rust version).
-    pub fn run_step(&self, py: Python<'_>, slf: Py<Self>) -> PyResult<()> {
-        let (coro, loop_, future, enter_fn, leave_fn) = {
-            let refs = slf.borrow(py);
-            (
-                refs.coro.clone_ref(py),
-                refs.loop_.clone_ref(py),
-                refs.future.clone_ref(py),
-                refs.enter_task_fn.clone_ref(py),
-                refs.leave_task_fn.clone_ref(py),
-            )
-        };
-
-        if future.call_method0(py, "done")?.is_truthy(py)? {
-            return Ok(());
-        }
-
-        // SOTA: Use cached function refs instead of py.import()
-        enter_fn.call1(py, (loop_.clone_ref(py), slf.clone_ref(py)))?;
-
-        // Note: run_step currently assumes no args (e.g. from ready queue).
-        // If we need to pass args, we need to store them on the task or infer from future.
-        // For standard task execution (send(None)), this is sufficient.
-        let result = {
-            let arg = py.None();
-            coro.call_method1(py, "send", (arg,))
-        };
-
-        // SOTA: Use cached function refs
-        leave_fn.call1(py, (loop_.clone_ref(py), slf.clone_ref(py)))?;
-
-        // Helper to get or create wakeup safely
-        let get_wakeup = || -> PyResult<PyObject> {
-            {
-                let refs = slf.borrow(py);
-                let w = refs.wakeup.lock();
-                if let Some(ref obj) = *w {
-                    return Ok(obj.clone_ref(py));
-                }
-            } // Lock released
-
-            let obj = slf.getattr(py, "_wakeup")?;
-            let refs = slf.borrow(py);
-            let mut w = refs.wakeup.lock();
-            *w = Some(obj.clone_ref(py));
-            Ok(obj)
-        };
-
-        match result {
-            Ok(yielded) => {
-                // Optimization: Check if yielded is our native UringFuture
-                if let Ok(uring_fut) = yielded.downcast_bound::<UringFuture>(py) {
-                    let refs = uring_fut.borrow();
-                    let state_guard = refs.state.lock();
-
-                    if matches!(*state_guard, FutureState::Pending) {
-                        drop(state_guard);
-                        let wakeup = get_wakeup()?;
-
-                        // Re-acquire lock to push callback
-                        let refs = uring_fut.borrow();
-                        let state_guard = refs.state.lock();
-                        if matches!(*state_guard, FutureState::Pending) {
-                            let mut cb_guard = refs.callbacks.lock();
-                            cb_guard.push((wakeup, None));
-                        } else {
-                            // Finished in between
-                            drop(state_guard);
-                            let args = (wakeup, yielded);
-                            // If finished, we just call wakeup.
-                            // wakeup -> _step -> run_step. recursion?
-                            // Standard asyncio uses call_soon.
-                            // Here we use call_soon to be safe and consistent with logic below
-
-                            let refs = slf.borrow(py);
-                            let kwargs = if let Some(ctx) = refs.context.as_ref() {
-                                let d = pyo3::types::PyDict::new(py);
-                                d.set_item("context", ctx)?;
-                                Some(d)
-                            } else {
-                                None
-                            };
-
-                            loop_.call_method(py, "call_soon", args, kwargs.as_ref())?;
-                        }
-                    } else {
-                        drop(state_guard);
-                        let wakeup = get_wakeup()?;
-                        let args = (wakeup, yielded);
-
-                        let refs = slf.borrow(py);
-                        let kwargs = if let Some(ctx) = refs.context.as_ref() {
-                            let d = pyo3::types::PyDict::new(py);
-                            d.set_item("context", ctx)?;
-                            Some(d)
-                        } else {
-                            None
-                        };
-
-                        loop_.call_method(py, "call_soon", args, kwargs.as_ref())?;
-                    }
-                } else if yielded.is_none(py) {
-                    // Task yielded None (e.g. sleep(0)). Re-schedule immediately.
-                    // Instead of call_soon, we push directly to core.
-                    let core = loop_.getattr(py, "_core")?;
-                    core.call_method1(py, "push_task", (slf.clone_ref(py),))?;
-                } else {
-                    let wakeup = get_wakeup()?;
-                    yielded.call_method1(py, "add_done_callback", (wakeup,))?;
-                }
-            }
-            Err(e) => {
-                if e.is_instance_of::<PyStopIteration>(py) {
-                    let value = e.value(py);
-                    let ret_val = value
-                        .getattr("value")
-                        .map_or_else(|_| py.None(), std::convert::Into::into);
-                    future.call_method1(py, "set_result", (ret_val,))?;
-                } else {
-                    future.call_method1(py, "set_exception", (e,))?;
-                }
-            }
-        }
         Ok(())
     }
 

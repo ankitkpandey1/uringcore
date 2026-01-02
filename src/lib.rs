@@ -829,8 +829,8 @@ impl UringCore {
         
         for handle in ready_batch {
             if let Ok(task) = handle.downcast_bound::<task::UringTask>(py) {
-                // Fast path: UringTask (most common in gather)
-                if let Err(e) = task.borrow().run_step(py, task.as_unbound().clone_ref(py)) {
+                // Fast path: UringTask (most common in gather) - pass scheduler for direct push
+                if let Err(e) = task.borrow().run_step(py, task.as_unbound().clone_ref(py), &self.scheduler) {
                     e.print(py);
                 }
             } else if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {

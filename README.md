@@ -15,24 +15,21 @@ It passes **99% of stdlib asyncio tests** and outperforms `uvloop` in many micro
 
 ## Key Features
 - **Pure io_uring**: No `epoll`/`selector` fallback. All I/O is submitted to the ring.
-- **Native Task Scheduling**: Custom Rust-based scheduler for high-throughput task management.
+- **Native Task Scheduling**: Custom Rust-based scheduler with batch drain optimization.
 - **Zero-Copy Buffers**: Pre-registered fixed buffers for maximum I/O bandwidth.
-- **Native Futures**: Optimized Future implementation in Rust for faster resolution.
-- **Strict Resource Management**: Deterministic cleanup of `io_uring` resources to prevent memory leaks (ENOMEM).
-- **Cancellation Safety**: Correct propagation of asyncio cancellation.
+- **Native Futures**: Optimized Future implementation entirely in Rust.
+- **Asyncio Function Caching**: Cached `_enter_task`/`_leave_task` to reduce per-step overhead.
+- **Registered FD Table**: `IOSQE_FIXED_FILE` support for zero FD lookup overhead.
+- **Zero-Copy Send**: `IORING_OP_SEND_ZC` for large payload efficiency (kernel 6.0+).
+- **Multishot Recv**: `RECV_MULTISHOT` for persistent connections (kernel 5.19+).
+- **Native Timers**: `IORING_OP_TIMEOUT` for zero-syscall timer management.
+- **Strict Resource Management**: Deterministic cleanup via `Drop` trait.
 
-## Installation
-Requires **Linux 5.10+** (5.19+ recommended) and **Python 3.10+**.
-
-```bash
-pip install uringcore
-```
-
-## benchmarks
+## Benchmarks
 Latest results (Jan 2026) vs `uvloop`:
-- `sleep(0)`: **2.6x faster** (5.19µs vs 13.65µs)
-- `future_res`: **2.7x faster** (4.48µs vs 12.42µs)
-- `call_later`: **1.3x faster** (12.35µs vs 16.74µs)
+- `sleep(0)`: **2.3x faster** (5.24µs vs 12.20µs)
+- `future_res`: **2.8x faster** (4.48µs vs 12.42µs)
+- `create_task`: **1.5x faster** (8.97µs vs 13.46µs)
 
 ## Introduction
 

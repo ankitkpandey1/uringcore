@@ -41,7 +41,7 @@ Latest results (Jan 2026) vs `uvloop`:
 
 ## Performance Verification
 
-To verify the system efficiency (syscall reduction), we profiled `gather(100)` using `strace`.
+To verify system efficiency (syscall reduction), `gather(100)` was profiled using `strace`.
 
 | Metric | uringcore | uvloop | Impact |
 |--------|-----------|--------|--------|
@@ -71,7 +71,7 @@ strace -c python3 benchmarks/syscall_bench.py uvloop
 - **uringcore**: Uses Python's standard `asyncio.Task` for **100% ecosystem compatibility**. Every task step requires control to pass from Rust -> Python Interpreter -> Python Task Object -> Rust.
 
 **Architectural Decision**: 
-We chose **NOT** to re-implement `Task` in Rust for V1.0. This maintains compatibility with tools that inspect `asyncio.Task` (debuggers, `nest_asyncio`, etc.) and avoids massive complexity. `uringcore` beats `asyncio` while providing massive I/O scalability (where syscalls matter more than micro-scheduling latency).
+Re-implementing `Task` in Rust was deliberately avoided for V1.0. This maintains compatibility with tools that inspect `asyncio.Task` (debuggers, `nest_asyncio`, etc.) and avoids massive complexity. `uringcore` beats `asyncio` while providing massive I/O scalability (where syscalls matter more than micro-scheduling latency).
 
 ## Introduction
 

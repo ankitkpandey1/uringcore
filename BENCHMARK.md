@@ -38,11 +38,11 @@ call_later           |       59.6µs |       17.5µs |       13.5µs  ⭐
 - **uringcore**: Uses Python's standard `asyncio.Task` for 100% ecosystem compatibility. Every task step requires control to pass from Rust -> Python Interpreter -> Python Task Object -> Rust.
 
 **Data**:
-- **Syscall Efficiency**: `uringcore` makes **1,979** syscalls vs `uvloop`'s **52,587** for the `gather(100)` benchmark. We are **26x more efficient** at the system level.
+- **Syscall Efficiency**: `uringcore` makes **1,979** syscalls vs `uvloop`'s **52,587** for the `gather(100)` benchmark. This represents **26x greater efficiency** at the system level.
 - **Latency Gap**: The ~48µs gap is purely userspace FFI (Foreign Function Interface) and Python object manipulation overhead.
 
 **Decision**: 
-We chose **NOT** to re-implement `Task` in Rust (like uvloop did in Cython) for V1.0. 
+Re-implementing `Task` in Rust (like uvloop did in Cython) was deliberately avoided for V1.0. 
 - **Pros**: It would close the 40µs gap.
 - **Cons**: It would break compatibility with tools that inspect `asyncio.Task` (debuggers, instrumentation, `nest_asyncio`, etc.) and increase complexity massively.
 - **Trade-off**: `uringcore` is faster than `asyncio` (1.13x) and significantly more scalable for real-world I/O (where syscalls matter more than micro-scheduling latency), while maintaining robust compatibility.

@@ -473,7 +473,7 @@ The Scheduler is a Rust-side component that manages the queue of ready-to-run Py
 
 **Design:** `Mutex<VecDeque<PyObject>>`
 
-While a lock-free queue (like `crossbeam-channel`) is standard for multi-threaded work stealing, `asyncio` is fundamentally single-threaded. Through benchmarking, we found that a simple `Mutex` protecting a `VecDeque` outperforms atomic channels because:
+While a lock-free queue (like `crossbeam-channel`) is standard for multi-threaded work stealing, `asyncio` is fundamentally single-threaded. Benchmarking revealed that a simple `Mutex` protecting a `VecDeque` outperforms atomic channels because:
 1.  **Allocation Reuse**: `VecDeque` reuses its capacity, avoiding per-push memory allocation.
 2.  **Cache Locality**: Contiguous memory access is faster than linked-list nodes.
 3.  **Low Contention**: The lock is only disputed when `loop.call_soon_threadsafe` pushes from another thread, which is rare in typical asyncio apps.

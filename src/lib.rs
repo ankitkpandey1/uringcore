@@ -244,9 +244,16 @@ impl UringCore {
 
     /// Unregister a file descriptor.
     fn unregister_fd(&self, fd: i32) {
-        // Return any pending buffers to the pool
+        let gen_id = self.buffer_pool.generation_id();
+
+        // 1. Release any inflight recv buffer for this FD
+        // This fixes the buffer leak when closing a socket with pending recv
+        if let Some(buf_idx) = self.inflight_recv_buffers.lock().remove(&fd) {
+            self.buffer_pool.release(buf_idx, gen_id);
+        }
+
+        // 2. Return any pending buffers from FD state to the pool
         if let Some(buffers) = self.fd_states.unregister(fd) {
-            let gen_id = self.buffer_pool.generation_id();
             for buf in buffers {
                 self.buffer_pool.release(buf.index, gen_id);
             }

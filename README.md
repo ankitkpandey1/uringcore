@@ -36,7 +36,7 @@ Latest results (Jan 2026) vs `uvloop`:
 
 **High-Concurrency (gather 100):**
 - `asyncio`: 173 µs
-- `uringcore`: **152 µs** (1.13x faster than asyncio)
+- `uringcore`: **153 µs** (1.13x faster than asyncio)
 - `uvloop`: 105 µs (gap is purely FFI overhead, syscalls are minimized)
 
 ## Performance Verification
@@ -63,7 +63,15 @@ strace -c python3 benchmarks/syscall_bench.py uringcore
 strace -c python3 benchmarks/syscall_bench.py uvloop
 ```
 
-This confirms that `uringcore` achieves its architectural goal of minimizing kernel context switches, even if raw Python FFI overhead remains.
+### Why is uringcore slower than uvloop on gather(100)?
+(153µs vs 105µs)
+
+**Root Cause**: Architectural decision to use standard `asyncio.Task`.
+- **uvloop**: Re-implements `Task` and `Future` completely in C. When a task yields, uvloop stays in C-land to schedule the next one.
+- **uringcore**: Uses Python's standard `asyncio.Task` for **100% ecosystem compatibility**. Every task step requires control to pass from Rust -> Python Interpreter -> Python Task Object -> Rust.
+
+**Architectural Decision**: 
+We chose **NOT** to re-implement `Task` in Rust for V1.0. This maintains compatibility with tools that inspect `asyncio.Task` (debuggers, `nest_asyncio`, etc.) and avoids massive complexity. `uringcore` beats `asyncio` while providing massive I/O scalability (where syscalls matter more than micro-scheduling latency).
 
 ## Introduction
 

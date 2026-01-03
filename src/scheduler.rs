@@ -3,7 +3,8 @@ use pyo3::prelude::*;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-/// A mutex-protected ready queue for Python tasks using VecDeque.
+/// A mutex-protected ready queue for Python tasks using `VecDeque`.
+///
 /// This optimized implementation reduces allocation and improves cache locality
 /// for single-threaded asyncio workloads compared to channel-based solutions.
 #[derive(Clone)]
@@ -56,7 +57,7 @@ impl Scheduler {
         if queue.is_empty() {
             return VecDeque::new();
         }
-        
+
         let count = queue.len();
         let mut new_queue = VecDeque::with_capacity(count);
         std::mem::swap(&mut *queue, &mut new_queue);

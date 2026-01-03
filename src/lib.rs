@@ -248,7 +248,8 @@ impl UringCore {
 
         // 1. Release any inflight recv buffer for this FD
         // This fixes the buffer leak when closing a socket with pending recv
-        if let Some(buf_idx) = self.inflight_recv_buffers.lock().remove(&fd) {
+        let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
+        if let Some(buf_idx) = buf_idx_opt {
             self.buffer_pool.release(buf_idx, gen_id);
         }
 
@@ -811,6 +812,8 @@ impl UringCore {
 
                 // Resolve Future
                 let future_opt = self.futures.lock().remove(&fd);
+                let mut handled = false;
+
                 if let Some(future) = future_opt {
                     if result < 0 {
                         // Error
@@ -819,7 +822,6 @@ impl UringCore {
                             std::io::Error::from_raw_os_error(-result).to_string(),
                         ));
 
-                        // Optimization: Check for native UringFuture
                         if let Ok(uring_fut) =
                             future.downcast_bound::<crate::future::UringFuture>(py)
                         {
@@ -830,6 +832,8 @@ impl UringCore {
                                 future,
                             ) {
                                 e.print(py);
+                            } else {
+                                handled = true;
                             }
                         } else {
                             if let Err(e) = future.call_method1(py, "set_exception", (err,)) {
@@ -852,6 +856,8 @@ impl UringCore {
                                         future,
                                     ) {
                                         e.print(py);
+                                    } else {
+                                        handled = true;
                                     }
                                 } else {
                                     if let Err(e) = future.call_method1(py, "set_result", (bytes,))
@@ -871,6 +877,8 @@ impl UringCore {
                                         future,
                                     ) {
                                         e.print(py);
+                                    } else {
+                                        handled = true;
                                     }
                                 } else {
                                     if let Err(e) = future.call_method1(py, "set_result", (empty,))
@@ -890,6 +898,8 @@ impl UringCore {
                                     future,
                                 ) {
                                     e.print(py);
+                                } else {
+                                    handled = true;
                                 }
                             } else {
                                 if let Err(e) = future.call_method1(py, "set_result", (result,)) {
@@ -897,6 +907,10 @@ impl UringCore {
                                 }
                             }
                         }
+                    }
+
+                    if handled {
+                        continue;
                     }
                 }
 

@@ -484,7 +484,7 @@ Expose runtime metrics (inflight buffers, queue lengths, completion latency, buf
 3.  **run_tick**: The main loop iteration logic in Rust that drains the scheduler queue and executes tasks.
 
 **Phase 10 Optimizations**:
-- `Mutex<VecDeque>` replaced with `crossbeam-channel` for lock-free push/drain
+- `Mutex<VecDeque>` replaced `crossbeam-channel` for efficient single-threaded access
 - Ring lock acquisitions merged (submit + drain_completions in single lock)
 - Python loop skips `epoll.poll` when ready tasks exist
 
@@ -568,7 +568,7 @@ The following state-of-the-art optimizations have been implemented or are availa
 | **Asyncio Function Caching** | ✅ Active | N/A |
 | **Native Timers** (`IORING_OP_TIMEOUT`) | ✅ Available | 5.4+ |
 | **Multishot Recv** (`IORING_OP_RECV` + `RECV_MULTISHOT`) | ✅ Available | 5.19+ |
-| **Lock-Free Scheduler** (`crossbeam-channel`) | ✅ Active | N/A |
+| **Native Scheduler** (`Mutex<VecDeque>`) | ✅ Active | N/A |
 | **Merged Ring Lock** (single lock per run_tick) | ✅ Active | N/A |
 | **Registered FD Table** (`IOSQE_FIXED_FILE`) | ✅ Available | 5.1+ |
 | **Zero-Copy Send** (`IORING_OP_SEND_ZC`) | ✅ Available | 6.0+ |
@@ -585,7 +585,7 @@ The following state-of-the-art optimizations have been implemented or are availa
 |--------|-----------|--------|---------|
 | `sleep(0)` | 5.24 µs | 12.20 µs | **2.3x** |
 | `create_task` | 8.97 µs | 13.46 µs | **1.5x** |
-| `future_res` | 4.48 µs | 12.42 µs | **2.8x** |
+| `gather(100)` | 139 µs | 105 µs | 0.75x |
 
 ---
 

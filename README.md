@@ -16,7 +16,7 @@ It passes **all tests** including proper stress testing and FastAPI/Starlette E2
 
 ## Key Features
 - **Pure io_uring**: No `epoll`/`selector` fallback. All I/O is submitted to the ring.
-- **Lock-Free Scheduler**: MPSC channel using `crossbeam-channel` for high-concurrency task scheduling.
+- **Native Scheduler**: `Mutex<VecDeque>` for efficient single-threaded task scheduling.
 - **Zero-Copy Buffers**: Pre-registered fixed buffers for maximum I/O bandwidth.
 - **Native Futures**: Optimized Future implementation entirely in Rust.
 - **Asyncio Function Caching**: Cached `_enter_task`/`_leave_task` to reduce per-step overhead.

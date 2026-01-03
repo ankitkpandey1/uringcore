@@ -1,12 +1,15 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use parking_lot::Mutex;
 use pyo3::prelude::*;
+use std::collections::VecDeque;
+use std::sync::Arc;
 
-/// A lock-free ready queue for Python tasks using crossbeam MPSC channel.
-/// This eliminates mutex contention in high-concurrency scenarios like gather(100).
+/// A mutex-protected ready queue for Python tasks using `VecDeque`.
+///
+/// This optimized implementation reduces allocation and improves cache locality
+/// for single-threaded asyncio workloads compared to channel-based solutions.
 #[derive(Clone)]
 pub struct Scheduler {
-    sender: Sender<PyObject>,
-    receiver: Receiver<PyObject>,
+    queue: Arc<Mutex<VecDeque<PyObject>>>,
 }
 
 impl Default for Scheduler {
@@ -18,43 +21,51 @@ impl Default for Scheduler {
 impl Scheduler {
     #[must_use]
     pub fn new() -> Self {
-        let (sender, receiver) = unbounded();
-        Self { sender, receiver }
+        Self {
+            queue: Arc::new(Mutex::new(VecDeque::with_capacity(256))),
+        }
     }
 
-    /// Push a task to the ready queue (lock-free).
+    /// Push a task to the ready queue.
     pub fn push(&self, handle: PyObject) {
-        // unbounded channel never blocks on send
-        let _ = self.sender.send(handle);
+        self.queue.lock().push_back(handle);
     }
 
     /// Pop a task from the ready queue.
     #[must_use]
     pub fn pop(&self) -> Option<PyObject> {
-        self.receiver.try_recv().ok()
+        self.queue.lock().pop_front()
     }
 
     /// Check if the queue is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.receiver.is_empty()
+        self.queue.lock().is_empty()
     }
 
     /// Get the number of pending tasks.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.receiver.len()
+        self.queue.lock().len()
     }
 
-    /// Drain all items from the queue efficiently (lock-free iteration).
+    /// Drain all items from the queue efficiently.
+    /// This swaps the underlying queue with a new empty one to minimize lock hold time.
     #[must_use]
-    pub fn drain(&self) -> Vec<PyObject> {
-        self.receiver.try_iter().collect()
+    pub fn drain(&self) -> VecDeque<PyObject> {
+        let mut queue = self.queue.lock();
+        if queue.is_empty() {
+            return VecDeque::new();
+        }
+
+        let count = queue.len();
+        let mut new_queue = VecDeque::with_capacity(count);
+        std::mem::swap(&mut *queue, &mut new_queue);
+        new_queue
     }
 
     /// Clear all items from the queue.
     pub fn clear(&self) {
-        // Drain and drop all items
-        for _ in self.receiver.try_iter() {}
+        self.queue.lock().clear();
     }
 }

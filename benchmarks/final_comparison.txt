@@ -1,0 +1,109 @@
+Note: plotly not available, skipping interactive charts
+============================================================
+uringcore Benchmark Suite
+============================================================
+Python: 3.14.2 (main, Jan  1 2026, 14:55:08) [GCC 14.2.0]
+Platform: linux
+
+[asyncio] Running benchmarks...
+  sleep(0): 5.25 µs/op (190322 ops/sec)
+  create_task: 6.85 µs/op (146034 ops/sec)
+  gather(10): 24.46 µs/op (40889 ops/sec)
+  gather(100): 170.01 µs/op (5882 ops/sec)
+  queue_put: 4.91 µs/op (203734 ops/sec)
+  event_wait: 4.40 µs/op (227382 ops/sec)
+  lock_acquire: 4.34 µs/op (230666 ops/sec)
+  future_res: 4.35 µs/op (229885 ops/sec)
+  call_soon: 6.37 µs/op (157003 ops/sec)
+  sleep_seq_10: 16.11 µs/op (62062 ops/sec)
+  sleep_conc_100: 236.96 µs/op (4220 ops/sec)
+  semaphore: 4.64 µs/op (215453 ops/sec)
+  condition: 12.65 µs/op (79080 ops/sec)
+  context_vars: 7.44 µs/op (134468 ops/sec)
+  call_later: 207.62 µs/op (4817 ops/sec)
+  task_cancel: 11.34 µs/op (88167 ops/sec)
+  shield: 9.81 µs/op (101918 ops/sec)
+  wait_for: 5.85 µs/op (170826 ops/sec)
+  recursion_20: 5.43 µs/op (184122 ops/sec)
+  exception: 4.48 µs/op (223230 ops/sec)
+  sock_pair: 19.36 µs/op (51652 ops/sec)
+
+[uvloop] Running benchmarks...
+  sleep(0): 12.44 µs/op (80412 ops/sec)
+  create_task: 12.82 µs/op (78007 ops/sec)
+  gather(10): 24.53 µs/op (40761 ops/sec)
+  gather(100): 116.15 µs/op (8610 ops/sec)
+  queue_put: 12.23 µs/op (81733 ops/sec)
+  event_wait: 11.32 µs/op (88311 ops/sec)
+  lock_acquire: 11.59 µs/op (86294 ops/sec)
+  future_res: 11.71 µs/op (85425 ops/sec)
+  call_soon: 12.68 µs/op (78844 ops/sec)
+  sleep_seq_10: 17.28 µs/op (57881 ops/sec)
+  sleep_conc_100: 154.30 µs/op (6481 ops/sec)
+  semaphore: 11.80 µs/op (84723 ops/sec)
+  condition: 17.15 µs/op (58309 ops/sec)
+  context_vars: 13.71 µs/op (72933 ops/sec)
+  call_later: 12.74 µs/op (78480 ops/sec)
+  task_cancel: 15.54 µs/op (64344 ops/sec)
+  shield: 14.83 µs/op (67440 ops/sec)
+  wait_for: 13.33 µs/op (75035 ops/sec)
+  recursion_20: 12.28 µs/op (81450 ops/sec)
+  exception: 11.99 µs/op (83415 ops/sec)
+  sock_pair: 29.57 µs/op (33823 ops/sec)
+
+[uringcore] Running benchmarks...
+  sleep(0): 3.56 µs/op (280897 ops/sec)
+  create_task: 5.52 µs/op (181209 ops/sec)
+  gather(10): 24.32 µs/op (41124 ops/sec)
+  gather(100): 188.11 µs/op (5316 ops/sec)
+  queue_put: 3.52 µs/op (284059 ops/sec)
+  event_wait: 3.13 µs/op (319498 ops/sec)
+  lock_acquire: 3.15 µs/op (317745 ops/sec)
+  future_res: 3.11 µs/op (321571 ops/sec)
+  call_soon: 4.49 µs/op (222963 ops/sec)
+  sleep_seq_10: 12.41 µs/op (80564 ops/sec)
+  sleep_conc_100: 276.77 µs/op (3613 ops/sec)
+  semaphore: 3.30 µs/op (302924 ops/sec)
+  condition: 9.88 µs/op (101165 ops/sec)
+  context_vars: 5.48 µs/op (182377 ops/sec)
+  call_later: 186.18 µs/op (5371 ops/sec)
+  task_cancel: 8.54 µs/op (117106 ops/sec)
+  shield: 7.50 µs/op (133345 ops/sec)
+  wait_for: 4.10 µs/op (244040 ops/sec)
+  recursion_20: 3.99 µs/op (250779 ops/sec)
+  exception: 2.95 µs/op (338471 ops/sec)
+
+[uringcore] Skipped: No buffers available for recv
+
+Results saved to /home/nkit_umar_andey/uringcore/benchmarks/results/benchmark_20260102_182036.json
+
+================================================================================
+Performance Comparison (microseconds per operation, lower is better)
+================================================================================
+Benchmark            |      asyncio |       uvloop |    Speedup
+---------------------------------------------------------------
+sleep(0)             |       5.25µs |      12.44µs |      0.42x
+create_task          |       6.85µs |      12.82µs |      0.53x
+gather(10)           |      24.46µs |      24.53µs |      1.00x
+gather(100)          |     170.01µs |     116.15µs |      1.46x
+queue_put            |       4.91µs |      12.23µs |      0.40x
+event_wait           |       4.40µs |      11.32µs |      0.39x
+lock_acquire         |       4.34µs |      11.59µs |      0.37x
+future_res           |       4.35µs |      11.71µs |      0.37x
+call_soon            |       6.37µs |      12.68µs |      0.50x
+sleep_seq_10         |      16.11µs |      17.28µs |      0.93x
+sleep_conc_100       |     236.96µs |     154.30µs |      1.54x
+semaphore            |       4.64µs |      11.80µs |      0.39x
+condition            |      12.65µs |      17.15µs |      0.74x
+context_vars         |       7.44µs |      13.71µs |      0.54x
+call_later           |     207.62µs |      12.74µs |     16.29x
+task_cancel          |      11.34µs |      15.54µs |      0.73x
+shield               |       9.81µs |      14.83µs |      0.66x
+wait_for             |       5.85µs |      13.33µs |      0.44x
+recursion_20         |       5.43µs |      12.28µs |      0.44x
+exception            |       4.48µs |      11.99µs |      0.37x
+sock_pair            |      19.36µs |      29.57µs |      0.65x
+================================================================================
+matplotlib not available, skipping chart generation
+
+Benchmark complete!

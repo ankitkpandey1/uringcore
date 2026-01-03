@@ -1,0 +1,75 @@
+Note: uvloop not available, skipping uvloop benchmarks
+Note: plotly not available, skipping interactive charts
+============================================================
+uringcore Benchmark Suite
+============================================================
+Python: 3.14.2 (main, Jan  1 2026, 14:55:08) [GCC 14.2.0]
+Platform: linux
+
+[asyncio] Running benchmarks...
+  sleep(0): 5.49 µs/op (182116 ops/sec)
+  create_task: 7.28 µs/op (137438 ops/sec)
+  gather(10): 26.41 µs/op (37865 ops/sec)
+  gather(100): 171.55 µs/op (5829 ops/sec)
+  queue_put: 5.04 µs/op (198524 ops/sec)
+  event_wait: 4.42 µs/op (226096 ops/sec)
+  lock_acquire: 4.40 µs/op (227436 ops/sec)
+  future_res: 4.40 µs/op (227427 ops/sec)
+  call_soon: 6.67 µs/op (149968 ops/sec)
+  sleep_seq_10: 16.27 µs/op (61458 ops/sec)
+  sleep_conc_100: 238.23 µs/op (4198 ops/sec)
+  semaphore: 4.60 µs/op (217530 ops/sec)
+  condition: 12.38 µs/op (80808 ops/sec)
+  context_vars: 7.66 µs/op (130483 ops/sec)
+  call_later: 205.18 µs/op (4874 ops/sec)
+  task_cancel: 11.33 µs/op (88237 ops/sec)
+  shield: 9.80 µs/op (102035 ops/sec)
+  wait_for: 5.90 µs/op (169590 ops/sec)
+  recursion_20: 5.37 µs/op (186121 ops/sec)
+  exception: 4.46 µs/op (224078 ops/sec)
+  sock_pair: 19.30 µs/op (51824 ops/sec)
+
+[uringcore] Running benchmarks...
+  sleep(0): 3.59 µs/op (278895 ops/sec)
+  create_task: 5.18 µs/op (193109 ops/sec)
+  gather(10): 25.06 µs/op (39905 ops/sec)
+  gather(100): 191.66 µs/op (5217 ops/sec)
+  queue_put: 3.57 µs/op (280006 ops/sec)
+  event_wait: 3.01 µs/op (332276 ops/sec)
+  lock_acquire: 3.05 µs/op (328065 ops/sec)
+  future_res: 3.08 µs/op (325201 ops/sec)
+
+[uringcore] Skipped: 'RuntimeError' object is not callable
+
+Results saved to /home/nkit_umar_andey/uringcore/benchmarks/results/benchmark_20260102_174250.json
+
+================================================================================
+Performance Comparison (microseconds per operation, lower is better)
+================================================================================
+Benchmark            |      asyncio
+-----------------------------------
+sleep(0)             |       5.49µs
+create_task          |       7.28µs
+gather(10)           |      26.41µs
+gather(100)          |     171.55µs
+queue_put            |       5.04µs
+event_wait           |       4.42µs
+lock_acquire         |       4.40µs
+future_res           |       4.40µs
+call_soon            |       6.67µs
+sleep_seq_10         |      16.27µs
+sleep_conc_100       |     238.23µs
+semaphore            |       4.60µs
+condition            |      12.38µs
+context_vars         |       7.66µs
+call_later           |     205.18µs
+task_cancel          |      11.33µs
+shield               |       9.80µs
+wait_for             |       5.90µs
+recursion_20         |       5.37µs
+exception            |       4.46µs
+sock_pair            |      19.30µs
+================================================================================
+matplotlib not available, skipping chart generation
+
+Benchmark complete!

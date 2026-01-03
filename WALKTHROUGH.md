@@ -37,7 +37,7 @@ This document provides a detailed walkthrough of the uringcore codebase, explain
 │                    python/uringcore/loop.py                              │
 │  ┌───────────────┐ ┌──────────────┐ ┌───────────────┐                   │
 │  │ _ready queue  │ │ _scheduled   │ │ _transports   │                   │
-│  │ (callbacks)   │ │ (heap)       │ │ (fd→transport)│                   │
+│  │ (DEPRECATED)  │ │ (heap)       │ │ (fd→transport)│                   │
 │  └───────────────┘ └──────────────┘ └───────────────┘                   │
 │                                     │                                    │
 │                           ┌─────────┴─────────┐                          │
@@ -54,6 +54,10 @@ This document provides a detailed walkthrough of the uringcore codebase, explain
 │  │  BufferPool   │ │     Ring     │ │ FDStateManager│                   │
 │  │  src/buffer.rs│ │  src/ring.rs │ │  src/state.rs │                   │
 │  └───────────────┘ └──────────────┘ └───────────────┘                   │
+│  ┌────────────────┐                                                      │
+│  │   Scheduler    │                                                      │
+│  │ src/scheduler.rs│                                                      │
+│  └────────────────┘                                                      │
 │                           │                                              │
 │                    ┌──────┴──────┐                                       │
 │                    │  io_uring   │                                       │
@@ -139,19 +143,12 @@ def __init__(self):
 impl UringCore {
     #[new]
     fn new(...) -> PyResult<Self> {
-        // 1. Create io_uring ring (with SQPOLL fallback)
-        let ring = Ring::new(ring_size, try_sqpoll)?;
+        // ... (ring/buffer pool/fd state init)
+
+        // 5. Create Scheduler (Mutex-protected ready queue)
+        let scheduler = Scheduler::new();
         
-        // 2. Create buffer pool (mmap + mlock)
-        let buffer_pool = BufferPool::new(buffer_count, buffer_size)?;
-        
-        // 3. Register buffers with io_uring
-        ring.register_buffers(Arc::clone(&buffer_pool))?;
-        
-        // 4. Create FD state manager
-        let fd_states = FDStateManager::new();
-        
-        Ok(Self { ring, buffer_pool, fd_states, ... })
+        Ok(Self { ring, buffer_pool, fd_states, scheduler, ... })
     }
 }
 ```
@@ -465,6 +462,43 @@ When the kernel completes I/O, it writes to the Completion Queue (CQ) and signal
 
 ---
 
+
+---
+
+## Scheduler Implementation
+
+**File:** `src/scheduler.rs`
+
+The Scheduler is a Rust-side component that manages the queue of ready-to-run Python tasks.
+
+**Design:** `Mutex<VecDeque<PyObject>>`
+
+While a lock-free queue (like `crossbeam-channel`) is standard for multi-threaded work stealing, `asyncio` is fundamentally single-threaded. Benchmarking revealed that a simple `Mutex` protecting a `VecDeque` outperforms atomic channels because:
+1.  **Allocation Reuse**: `VecDeque` reuses its capacity, avoiding per-push memory allocation.
+2.  **Cache Locality**: Contiguous memory access is faster than linked-list nodes.
+3.  **Low Contention**: The lock is only disputed when `loop.call_soon_threadsafe` pushes from another thread, which is rare in typical asyncio apps.
+
+**Batch Processing:**
+
+To minimize lock overhead, `run_tick` drains the queue in a single batch:
+
+```rust
+pub fn drain(&self) -> VecDeque<PyObject> {
+    let mut queue = self.queue.lock();
+    if queue.is_empty() {
+        return VecDeque::new();
+    }
+
+    // Optimization: Swap with empty queue to release lock immediately
+    let count = queue.len();
+    let mut new_queue = VecDeque::with_capacity(count);
+    std::mem::swap(&mut *queue, &mut new_queue);
+    new_queue
+}
+```
+
+---
+
 ## Code File Reference
 
 | File | Purpose |
@@ -478,6 +512,7 @@ When the kernel completes I/O, it writes to the Completion Queue (CQ) and signal
 | `src/lib.rs` | UringCore PyO3 class |
 | `src/ring.rs` | io_uring Ring wrapper |
 | `src/buffer.rs` | Zero-copy buffer pool |
+| `src/scheduler.rs` | Task ready queue |
 | `src/state.rs` | Per-FD state machine |
 | `src/error.rs` | Error types |
 

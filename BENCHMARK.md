@@ -22,7 +22,7 @@ This document presents performance benchmarks comparing `uringcore` against stan
 Benchmark            |      asyncio |       uvloop |    uringcore
 ---------------------------------------------------------------
 sleep(0)             |      173.0µs |      105.0µs |      152.0µs
-gather(100)          |      173.0µs |      105.0µs |      153.4µs  ✅
+gather(100)          |      173.0µs |      105.0µs |      138.9µs  ✅
 sock_pair            |       32.5µs |       42.9µs |       35.0µs  ✅
 call_later           |       59.6µs |       17.5µs |       13.5µs  ⭐
 

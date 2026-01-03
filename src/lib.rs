@@ -812,7 +812,6 @@ impl UringCore {
 
                 // Resolve Future
                 let future_opt = self.futures.lock().remove(&fd);
-                let mut handled = false;
 
                 if let Some(future) = future_opt {
                     if result < 0 {
@@ -832,8 +831,6 @@ impl UringCore {
                                 future,
                             ) {
                                 e.print(py);
-                            } else {
-                                handled = true;
                             }
                         } else {
                             if let Err(e) = future.call_method1(py, "set_exception", (err,)) {
@@ -856,8 +853,6 @@ impl UringCore {
                                         future,
                                     ) {
                                         e.print(py);
-                                    } else {
-                                        handled = true;
                                     }
                                 } else {
                                     if let Err(e) = future.call_method1(py, "set_result", (bytes,))
@@ -877,8 +872,6 @@ impl UringCore {
                                         future,
                                     ) {
                                         e.print(py);
-                                    } else {
-                                        handled = true;
                                     }
                                 } else {
                                     if let Err(e) = future.call_method1(py, "set_result", (empty,))
@@ -898,8 +891,6 @@ impl UringCore {
                                     future,
                                 ) {
                                     e.print(py);
-                                } else {
-                                    handled = true;
                                 }
                             } else {
                                 if let Err(e) = future.call_method1(py, "set_result", (result,)) {
@@ -907,10 +898,6 @@ impl UringCore {
                                 }
                             }
                         }
-                    }
-
-                    if handled {
-                        continue;
                     }
                 }
 

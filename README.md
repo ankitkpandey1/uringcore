@@ -36,7 +36,7 @@ Latest results (Jan 2026) vs `uvloop`:
 
 **High-Concurrency (gather 100):**
 - `asyncio`: 173 µs
-- `uringcore`: **153 µs** (1.13x faster than asyncio)
+- `uringcore`: **139 µs** (1.25x faster than asyncio)
 - `uvloop`: 105 µs (gap is purely FFI overhead, syscalls are minimized)
 
 ## Performance Verification
@@ -64,7 +64,7 @@ strace -c python3 benchmarks/syscall_bench.py uvloop
 ```
 
 ### Why is uringcore slower than uvloop on gather(100)?
-(153µs vs 105µs)
+(139µs vs 105µs)
 
 **Root Cause**: Architectural decision to use standard `asyncio.Task`.
 - **uvloop**: Re-implements `Task` and `Future` completely in C. When a task yields, uvloop stays in C-land to schedule the next one.

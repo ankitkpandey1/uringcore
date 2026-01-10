@@ -103,9 +103,9 @@ pub enum OpType {
     SendZC = 7,
     /// Multishot accept (kernel 5.19+)
     AcceptMulti = 8,
-    /// RecvMsg operation
+    /// `RecvMsg` operation
     RecvMsg = 9,
-    /// SendMsg operation
+    /// `SendMsg` operation
     SendMsg = 10,
     /// Provided buffer ring group ID
     ProvideBuffer = 11,

@@ -10,11 +10,11 @@ This document presents performance benchmarks comparing `uringcore` against stan
 
 | Category | uringcore vs asyncio | uringcore vs uvloop |
 |----------|---------------------|---------------------|
-| Basic operations (sleep, futures) | ✅ Competitive | ✅ Faster (1.5-2x) |
-| Task scheduling (call_soon, call_later) | ✅ Faster | ✅ Faster (1.2-4x) |
-| Synchronization primitives | ✅ Faster | ✅ Faster (2-3x) |
-| High concurrency (gather 100+) | ⚠️ Slightly Slower | ⚠️ Slower (0.6x) |
-| Socket I/O | ✅ Faster than asyncio | ✅ Competitive with uvloop |
+| Basic operations (sleep, futures) | Competitive | Faster (1.5-2x) |
+| Task scheduling (call_soon, call_later) | Faster | Faster (1.2-4x) |
+| Synchronization primitives | Faster | Faster (2-3x) |
+| High concurrency (gather 100+) | Slightly Slower | Slower (0.6x) |
+| Socket I/O | Faster than asyncio | Competitive with uvloop |
 
 ### Detailed Results (µs/op, lower is better)
 
@@ -22,14 +22,12 @@ This document presents performance benchmarks comparing `uringcore` against stan
 Benchmark            |      asyncio |       uvloop |    uringcore
 ---------------------------------------------------------------
 sleep(0)             |      173.0µs |      105.0µs |      152.0µs
-gather(100)          |      173.0µs |      105.0µs |      138.9µs  ✅
-sock_pair            |       32.5µs |       42.9µs |       35.0µs  ✅
-sock_sendto (UDP)    | ~550k ops/s |    N/A [*]   | ~831k ops/s  🚀
-call_later           |       59.6µs |       17.5µs |       13.5µs  ⭐
+gather(100)          |      173.0µs |      105.0µs |      138.9µs
+sock_pair            |       32.5µs |       42.9µs |       35.0µs
+sock_sendto (UDP)    | ~550k ops/s |    N/A [*]   | ~831k ops/s
+call_later           |       59.6µs |       17.5µs |       13.5µs
 
 [*] uvloop does not implement sock_sendto (NotImplementedError).
-
-⭐ = Competitive or close to best (uringcore results for sleep/gather are from micro-benchmark tests/bench_gather.py)
 ```
 
 ## Analysis

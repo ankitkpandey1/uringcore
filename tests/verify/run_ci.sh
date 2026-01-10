@@ -12,11 +12,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Starting Verification Test: $TEST_NAME"
+# Resolve Python interpreter (prefer project venv)
+PYTHON_CMD="python"
+if [ -f "../../.venv/bin/python" ]; then
+    PYTHON_CMD="../../.venv/bin/python"
+fi
+
+echo "Starting Verification Test: $TEST_NAME using $PYTHON_CMD"
 
 if [ "$TEST_NAME" == "fastapi" ]; then
     # Run FastAPI with uringcore (default config)
-    python -c "
+    $PYTHON_CMD -c "
 import asyncio, uringcore
 asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 import uvicorn
@@ -33,7 +39,7 @@ uvicorn.run(app.app, host='127.0.0.1', port=8000)
     
 elif [ "$TEST_NAME" == "starlette" ]; then
     # Run Starlette streaming
-    python -c "
+    $PYTHON_CMD -c "
 import asyncio, uringcore
 asyncio.set_event_loop_policy(uringcore.EventLoopPolicy())
 import uvicorn
@@ -51,6 +57,8 @@ uvicorn.run(stream_app.app, host='127.0.0.1', port=8001)
     
 elif [ "$TEST_NAME" == "django" ]; then
     # Run Django with Daphne
+    # Daphne is an executable, usually in venv/bin. Ensure PATH includes it or use venv path.
+    export PATH="../../.venv/bin:$PATH"
     cd testproj
     daphne -p 8002 testproj.asgi:application > django_ci.log 2>&1 &
     PID=$!
@@ -63,7 +71,7 @@ elif [ "$TEST_NAME" == "django" ]; then
 
 elif [ "$TEST_NAME" == "nosqpoll" ]; then
     # Run with try_sqpoll=False
-    python -c "
+    $PYTHON_CMD -c "
 import asyncio, uringcore
 # Disable SQPOLL explicitly
 loop = uringcore.UringEventLoop(try_sqpoll=False)

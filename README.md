@@ -8,7 +8,7 @@
 A high-performance asyncio event loop for Linux using io_uring.
 
 ## Project Status
-**Current Phase:** Phase 15 (Final Polish & Release)
+**Current Version:** 1.0.0 (Production Ready)
 
 `uringcore` is a high-performance, drop-in replacement for `asyncio` on Linux.
 It passes **all tests** including proper stress testing and FastAPI/Starlette E2E tests, and outperforms `uvloop` in single-task latency benchmarks.

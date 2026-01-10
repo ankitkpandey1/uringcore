@@ -20,7 +20,16 @@ fi
 
 echo "Starting Verification Test: $TEST_NAME using $PYTHON_CMD"
 
+
+# Kill any existing process on the target port
+cleanup_port() {
+    local port=$1
+    fuser -k -n tcp $port 2>/dev/null || true
+    sleep 1
+}
+
 if [ "$TEST_NAME" == "fastapi" ]; then
+    cleanup_port 8000
     # Run FastAPI with uringcore (default config)
     $PYTHON_CMD -c "
 import asyncio, uringcore
@@ -35,9 +44,14 @@ uvicorn.run(app.app, host='127.0.0.1', port=8000)
     sleep 3
     
     # Run wrk
-    wrk -t4 -c100 -d5s http://127.0.0.1:8000/ping
+    if command -v wrk >/dev/null; then
+        wrk -t4 -c100 -d5s http://127.0.0.1:8000/ping
+    else
+        curl -s http://127.0.0.1:8000/ping
+    fi
     
 elif [ "$TEST_NAME" == "starlette" ]; then
+    cleanup_port 8001
     # Run Starlette streaming
     $PYTHON_CMD -c "
 import asyncio, uringcore
@@ -56,6 +70,7 @@ uvicorn.run(stream_app.app, host='127.0.0.1', port=8001)
     curl -sN http://127.0.0.1:8001/stream | grep -q "0"
     
 elif [ "$TEST_NAME" == "django" ]; then
+    cleanup_port 8002
     # Run Django with Daphne
     # Daphne is an executable, usually in venv/bin. Ensure PATH includes it or use venv path.
     export PATH="../../.venv/bin:$PATH"
@@ -70,6 +85,7 @@ elif [ "$TEST_NAME" == "django" ]; then
     curl -I http://127.0.0.1:8002/admin/login/?next=/admin/ | grep -E "HTTP/1.1 (200|302)"
 
 elif [ "$TEST_NAME" == "nosqpoll" ]; then
+    cleanup_port 8003
     # Run with try_sqpoll=False
     $PYTHON_CMD -c "
 import asyncio, uringcore
@@ -84,7 +100,11 @@ uvicorn.run(app.app, host='127.0.0.1', port=8003)
     
     sleep 3
     
-    wrk -t4 -c100 -d5s http://127.0.0.1:8003/ping
+    if command -v wrk >/dev/null; then
+        wrk -t4 -c100 -d5s http://127.0.0.1:8003/ping
+    else
+        echo "Check: $(curl -s http://127.0.0.1:8003/ping)"
+    fi
 
 else
     echo "Unknown test: $TEST_NAME"

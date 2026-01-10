@@ -110,6 +110,20 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Native I/O futures: (fd, op_type) -> Future
         self._io_futures: dict[tuple[int, str], asyncio.Future[Any]] = {}
 
+        # Design Decision: Dispatch Map
+        # Replace if-elif ladder with O(1) dictionary lookup for completion handlers.
+        # This improves maintainability and potentially performance for high-throughput loops.
+        self._completion_handlers = {
+            "recv": self._handle_recv_completion,
+            "recv_multi": self._handle_recv_completion,
+            "send": self._handle_send_completion,
+            "accept": self._handle_accept_completion,
+            "accept_multi": self._handle_accept_multi_completion,
+            "recvmsg": self._handle_recvmsg_completion,
+            "sendmsg": self._handle_sendmsg_completion,
+            "close": self._handle_close_completion,
+        }
+
     # =========================================================================
     # Task Factory support (Abstract Methods)
     # =========================================================================
@@ -312,24 +326,20 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
     def _process_completions(self, completions):
         """Process completions from the io_uring ring."""
+        # Design Decision: Fast-path dispatch
+        # Using a bound method from the pre-computed dictionary avoids attribute
+        # lookup overhead on every iteration.
+        
+        # Optimization: Local variable access is faster than attribute access
+        handlers = self._completion_handlers
 
         for fd, op_type, result, data in completions:
-            if op_type == "recv":
-                self._handle_recv_completion(fd, result, data)
-            elif op_type == "send":
-                self._handle_send_completion(fd, result)
-            elif op_type == "accept":
-                self._handle_accept_completion(fd, result)
-            elif op_type == "accept_multi":
-                self._handle_accept_multi_completion(fd, result)
-            elif op_type == "recv_multi":
-                self._handle_recv_completion(fd, result, data)
-            elif op_type == "recvmsg":
-                self._handle_recvmsg_completion(fd, result, data)
-            elif op_type == "sendmsg":
-                self._handle_sendmsg_completion(fd, result)
-            elif op_type == "close":
-                self._handle_close_completion(fd, result)
+            handler = handlers.get(op_type)
+            if handler is not None:
+                handler(fd, result, data)
+            else:
+                # Should not happen in normal operation
+                pass
 
     def _handle_recv_completion(self, fd: int, result: int, data: Optional[bytes]):
         """Handle a receive completion."""
@@ -380,7 +390,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             else:
                  fut.set_exception(OSError(-result, os.strerror(-result)))
 
-    def _handle_sendmsg_completion(self, fd: int, result: int):
+    def _handle_sendmsg_completion(self, fd: int, result: int, data: Any):
         """Handle a sendmsg completion."""
         fut = self._io_futures.pop((fd, "sendmsg"), None)
         if fut is not None and not fut.done():
@@ -389,7 +399,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             else:
                  fut.set_exception(OSError(-result, os.strerror(-result)))
 
-    def _handle_send_completion(self, fd: int, result: int):
+    def _handle_send_completion(self, fd: int, result: int, data: Any):
         """Handle a send completion."""
         # Check for direct I/O future
         fut = self._io_futures.pop((fd, "send"), None)
@@ -403,7 +413,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         if transport is not None:
              transport._send_completed(result)
 
-    def _handle_accept_completion(self, fd: int, result: int):
+    def _handle_accept_completion(self, fd: int, result: int, data: Any):
         """Handle an accept completion."""
         fut = self._io_futures.pop((fd, "accept"), None)
 
@@ -431,7 +441,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             if fut is not None and not fut.done():
                 fut.set_exception(OSError(-result, os.strerror(-result)))
 
-    def _handle_accept_multi_completion(self, fd: int, result: int):
+    def _handle_accept_multi_completion(self, fd: int, result: int, data: Any):
         """Handle a multishot accept completion."""
         # print(f"DEBUG: AcceptMulti completion fd={fd} result={result}")
         if result >= 0:
@@ -455,7 +465,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             # Log other errors?
             pass
 
-    def _handle_close_completion(self, fd: int, result: int):
+    def _handle_close_completion(self, fd: int, result: int, data: Any):
         """Handle a close completion."""
         self._transports.pop(fd, None)
         self._core.unregister_fd(fd)

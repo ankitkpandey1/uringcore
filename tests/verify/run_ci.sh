@@ -18,6 +18,10 @@ if [ -f "../../.venv/bin/python" ]; then
     PYTHON_CMD="../../.venv/bin/python"
 fi
 
+# Configure conservative buffer limits for CI (prevent ENOMEM on low RLIMIT_MEMLOCK)
+export URINGCORE_BUFFER_COUNT=1024
+export URINGCORE_BUFFER_SIZE=4096
+
 echo "Starting Verification Test: $TEST_NAME using $PYTHON_CMD"
 
 

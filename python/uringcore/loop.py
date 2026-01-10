@@ -36,6 +36,12 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     Completions are delivered via eventfd signaling.
     """
 
+    # Design Decision: Default buffer settings balance memory usage vs throughput.
+    # Larger buffers (8KB) favor standard MTU + overhead, while count (4096)
+    # ensures sufficient depth for high-throughput bursts.
+    DEFAULT_BUFFER_COUNT = 4096
+    DEFAULT_BUFFER_SIZE = 8192
+
     def __init__(self, **kwargs):
         """Initialize the event loop."""
         self._closed = False
@@ -43,21 +49,13 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         self._running = False
         self._task_factory = None
 
-        # Support environment variable configuration for buffer settings
-        # URINGCORE_BUFFER_COUNT: Number of buffers (default: 4096)
-        # URINGCORE_BUFFER_SIZE: Size of each buffer in bytes (default: 8192)
-        env_buffer_count = os.environ.get("URINGCORE_BUFFER_COUNT")
-        env_buffer_size = os.environ.get("URINGCORE_BUFFER_SIZE")
+        # Design Decision: Allow runtime tuning via environment variables to support
+        # containerized deployments without code changes.
+        buffer_count = int(os.environ.get("URINGCORE_BUFFER_COUNT", self.DEFAULT_BUFFER_COUNT))
+        buffer_size = int(os.environ.get("URINGCORE_BUFFER_SIZE", self.DEFAULT_BUFFER_SIZE))
 
-        if env_buffer_count is not None:
-            kwargs.setdefault("buffer_count", int(env_buffer_count))
-        else:
-            kwargs.setdefault("buffer_count", 4096)
-
-        if env_buffer_size is not None:
-            kwargs.setdefault("buffer_size", int(env_buffer_size))
-        else:
-            kwargs.setdefault("buffer_size", 8192)
+        kwargs.setdefault("buffer_count", buffer_count)
+        kwargs.setdefault("buffer_size", buffer_size)
 
         # Initialize the Rust core
         try:
@@ -369,21 +367,16 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
     def _handle_recvmsg_completion(self, fd: int, result: int, data: Any):
         """Handle a recvmsg completion."""
-        # data is expected to be (bytes, address_tuple) or None
         fut = self._io_futures.pop((fd, "recvmsg"), None)
         
-        if fut is not None and not fut.done():
+        if fut and not fut.done():
             if result >= 0:
+                # Design Decision: recvmsg returns (bytes, address).
+                # If data is missing but result >= 0, it implies an empty datagram.
                 if data:
                     fut.set_result(data)
                 else:
-                    # Logic for empty datagrams or just result=0 case if Rust handles it
-                    # (bytes, addr)
-                    # If data is None but result >=0, it implies empty payload or parse failure?
-                    # For now assuming data is populated if result > 0.
-                    # If result == 0, data might be None from Rust currently.
-                    # We might handle empty bytes here if needed.
-                    pass
+                    fut.set_result((b"", None))
             else:
                  fut.set_exception(OSError(-result, os.strerror(-result)))
 
@@ -719,7 +712,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
         # Check if we should use io_uring
         # For small sends, overhead might be higher, but for consistency we use it.
-        # Optimization: Try direct syscall first (Fast Path)
+        # Design Decision: Optimistic Syscall Fast-Path
+        # Attempt direct syscall to bypass io_uring submission overhead for non-blocked sockets.
         try:
             return sock.sendto(data, address)
         except BlockingIOError:

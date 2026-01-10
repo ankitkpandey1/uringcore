@@ -146,7 +146,8 @@ pub struct UringCore {
     scheduler: Scheduler,
     /// Future map for Native Completion (FD -> Future)
     futures: Mutex<HashMap<i32, PyObject>>,
-    /// Provided Buffer Ring (SOTA)
+    /// Provided Buffer Ring
+    /// Register a file descriptor for fixed file optimization.
     pbuf_ring: Option<Arc<buf_ring::PBufRing>>,
     /// Reader callbacks: fd -> (callback, args)
     readers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
@@ -190,7 +191,7 @@ impl UringCore {
         ring.register_buffers(pool.clone())
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
-        // Try to set up Provided Buffer Ring (SOTA Phase 7) if supported
+        // Try to set up Provided Buffer Ring if supported
         let mut pbuf_ring = None;
         // Use BGID 1 for the default group
         let bgid = 1;
@@ -499,7 +500,7 @@ impl UringCore {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
 
-    /// Register a file descriptor for fixed file optimization (SOTA Phase 8).
+    /// Register a file descriptor for fixed file optimization.
     ///
     /// Returns the fixed index.
     fn register_file(&self, fd: i32) -> PyResult<u32> {

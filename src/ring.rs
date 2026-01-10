@@ -97,16 +97,16 @@ pub enum OpType {
     Close = 4,
     /// Timeout operation
     Timeout = 5,
-    /// SOTA: Multishot receive (kernel 5.19+)
+    /// Multishot receive (kernel 5.19+)
     RecvMulti = 6,
-    /// SOTA: Zero-copy send (kernel 6.0+)
+    /// Zero-copy send (kernel 6.0+)
     SendZC = 7,
-    /// SOTA: Multishot accept (kernel 5.19+)
+    /// Multishot accept (kernel 5.19+)
     AcceptMulti = 8,
-    /// Receive message (recvmsg)
-    RecvMsg = 9,
-    /// Send message (sendmsg)
-    SendMsg = 10,
+    /// Provided buffer ring group ID
+    ProvideBuffer = 9,
+    /// Registered FD table (`IOSQE_FIXED_FILE`)
+    FixedFdTable = 10,
     /// Unknown operation
     Unknown = 255,
 }
@@ -188,9 +188,9 @@ pub struct Ring {
     is_active: AtomicBool,
     /// Buffer pool reference for registered buffers
     buffer_pool: Option<Arc<BufferPool>>,
-    /// SOTA: Registered FD table (`IOSQE_FIXED_FILE`)
+    /// Registered FD table (`IOSQE_FIXED_FILE`)
     registered_fds: Option<FixedFdTable>,
-    /// SOTA: Provided buffer ring group ID
+    /// Provided buffer ring group ID
     provided_buf_group_id: Option<u16>,
 }
 

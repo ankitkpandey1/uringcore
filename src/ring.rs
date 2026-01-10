@@ -103,10 +103,14 @@ pub enum OpType {
     SendZC = 7,
     /// Multishot accept (kernel 5.19+)
     AcceptMulti = 8,
+    /// RecvMsg operation
+    RecvMsg = 9,
+    /// SendMsg operation
+    SendMsg = 10,
     /// Provided buffer ring group ID
-    ProvideBuffer = 9,
+    ProvideBuffer = 11,
     /// Registered FD table (`IOSQE_FIXED_FILE`)
-    FixedFdTable = 10,
+    FixedFdTable = 12,
     /// Unknown operation
     Unknown = 255,
 }
@@ -127,6 +131,8 @@ impl OpType {
             8 => Self::AcceptMulti,
             9 => Self::RecvMsg,
             10 => Self::SendMsg,
+            11 => Self::ProvideBuffer,
+            12 => Self::FixedFdTable,
             _ => Self::Unknown,
         }
     }
@@ -146,6 +152,8 @@ impl OpType {
             Self::AcceptMulti => "accept_multi",
             Self::RecvMsg => "recvmsg",
             Self::SendMsg => "sendmsg",
+            Self::ProvideBuffer => "provide_buffer",
+            Self::FixedFdTable => "fixed_fd_table",
             Self::Unknown => "unknown",
         }
     }

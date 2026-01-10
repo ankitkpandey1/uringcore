@@ -365,6 +365,8 @@ impl UringCore {
                 OpType::AcceptMulti => "accept_multi",
                 OpType::RecvMsg => "recvmsg",
                 OpType::SendMsg => "sendmsg",
+                OpType::ProvideBuffer => "provide_buffer",
+                OpType::FixedFdTable => "fixed_fd_table",
                 OpType::Unknown => "unknown",
             };
 

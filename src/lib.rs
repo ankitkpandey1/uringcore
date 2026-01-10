@@ -763,22 +763,36 @@ impl UringCore {
             count
         };
 
-        // 2. Submit pending I/O and process completions (single lock acquisition)
-        {
+        // 2. Submit pending I/O and process completions
+        let completions = {
             let mut ring = self.ring.lock();
             ring.submit()
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            let completions = ring.drain_completions();
+            ring.drain_completions()
+        };
 
+        if !completions.is_empty() {
+            // Intermediate storage for Phase 1 processing
+            struct CompletionItem {
+                fd: i32,
+                result: i32,
+                op_type: OpType,
+                data_bytes: Option<PyObject>,
+            }
+
+            let mut items = Vec::with_capacity(completions.len());
+            let mut fds_to_resolve = Vec::with_capacity(completions.len());
+
+            // Phase 1: Buffer management and data extraction (No futures lock)
             for cqe in completions {
                 let fd = cqe.fd();
                 let result = cqe.result;
-                let op_type_str = cqe.op_type();
+                let op_type = cqe.op_type();
 
                 // Handle buffer release for recv / data extraction
                 let mut data_bytes: Option<PyObject> = None;
 
-                if matches!(op_type_str, OpType::RecvMulti) {
+                if matches!(op_type, OpType::RecvMulti) {
                     if let Some(buf_idx) = cqe.buffer_index {
                         if result > 0 {
                             let len = result as usize;
@@ -790,7 +804,7 @@ impl UringCore {
                     }
                 }
 
-                if matches!(op_type_str, OpType::Recv) {
+                if matches!(op_type, OpType::Recv) {
                     let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
                     if let Some(buf_idx) = buf_idx_opt {
                         if result > 0 {
@@ -807,11 +821,38 @@ impl UringCore {
                     }
                 }
 
+                items.push(CompletionItem {
+                    fd,
+                    result,
+                    op_type,
+                    data_bytes,
+                });
+                fds_to_resolve.push(fd);
+            }
+
+            // Phase 2: Batch remove futures (Single futures lock)
+            let mut resolved_futures = HashMap::new();
+            if !fds_to_resolve.is_empty() {
+                let mut futures_guard = self.futures.lock();
+                for fd in fds_to_resolve {
+                    if let Some(fut) = futures_guard.remove(&fd) {
+                        resolved_futures.insert(fd, fut);
+                    }
+                }
+            }
+
+            // Phase 3: Resolve futures and build results
+            for item in items {
+                let fd = item.fd;
+                let result = item.result;
+                let op_type = item.op_type;
+                let data_bytes = item.data_bytes;
+
                 // Clone data for return value (Python tuple) BEFORE consuming data_bytes in future resolution
                 let data_for_tuple = data_bytes.as_ref().map(|p| p.clone_ref(py));
 
                 // Resolve Future
-                let future_opt = self.futures.lock().remove(&fd);
+                let future_opt = resolved_futures.remove(&fd);
 
                 if let Some(future) = future_opt {
                     if result < 0 {
@@ -839,8 +880,8 @@ impl UringCore {
                         }
                     } else {
                         // Success
-                        if matches!(op_type_str, OpType::Recv)
-                            || matches!(op_type_str, OpType::RecvMulti)
+                        if matches!(op_type, OpType::Recv)
+                            || matches!(op_type, OpType::RecvMulti)
                         {
                             if let Some(bytes) = data_bytes {
                                 if let Ok(uring_fut) =
@@ -903,7 +944,7 @@ impl UringCore {
 
                 // Add to results list for Python side processing (even if future resolved)
                 let data_obj = data_for_tuple.unwrap_or_else(|| py.None());
-                let op_str = op_type_str.as_str();
+                let op_str = op_type.as_str();
                 let tuple = (fd, op_str, result, data_obj).into_pyobject(py)?;
                 results.push(tuple.into());
             }

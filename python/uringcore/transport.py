@@ -58,8 +58,11 @@ class UringSocketTransport(asyncio.Transport):
             return
         self._closing = True
 
-        # Submit close via io_uring
-        self._loop._core.submit_close(self._fd)
+        if self._sock:
+            self._sock.close()
+        else:
+             # Submit close via io_uring
+             self._loop._core.submit_close(self._fd)
 
     def is_reading(self):
         """Return True if the transport is receiving."""

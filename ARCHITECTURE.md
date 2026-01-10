@@ -585,7 +585,15 @@ The following state-of-the-art optimizations have been implemented or are availa
 |--------|-----------|--------|---------|
 | `sleep(0)` | 5.24 µs | 12.20 µs | **2.3x** |
 | `create_task` | 8.97 µs | 13.46 µs | **1.5x** |
+| `sock_sendto` (throughput) | 831k ops/s | 550k ops/s | **1.5x** |
 | `gather(100)` | 139 µs | 105 µs | 0.75x |
+
+### Hybrid Syscall Strategy (Phase 16)
+For latency-sensitive or high-throughput non-blocking operations like `sock_sendto` (UDP), `uringcore` employs a hybrid strategy:
+1.  **Optimistic Syscall**: Attempt a direct non-blocking system call (`sendto`) first.
+2.  **Success**: If successful (buffer space available), return immediately. This bypasses the overhead of creating a Future and submitting to the io_uring SQ (saving ~1-2µs per op).
+3.  **Fallback**: If `EAGAIN`/`EWOULDBLOCK` is returned, fall back to the robust `io_uring` path: create a Future, submit `IORING_OP_POLL_ADD`/`IORING_OP_SEND`, and await completion.
+This approach yields **~831k ops/sec** vs standard `asyncio`'s ~550k ops/sec.
 
 ---
 

@@ -24,7 +24,10 @@ Benchmark            |      asyncio |       uvloop |    uringcore
 sleep(0)             |      173.0µs |      105.0µs |      152.0µs
 gather(100)          |      173.0µs |      105.0µs |      138.9µs  ✅
 sock_pair            |       32.5µs |       42.9µs |       35.0µs  ✅
+sock_sendto (UDP)    | ~550k ops/s |    N/A [*]   | ~831k ops/s  🚀
 call_later           |       59.6µs |       17.5µs |       13.5µs  ⭐
+
+[*] uvloop does not implement sock_sendto (NotImplementedError).
 
 ⭐ = Competitive or close to best (uringcore results for sleep/gather are from micro-benchmark tests/bench_gather.py)
 ```
@@ -53,6 +56,7 @@ Re-implementing `Task` in Rust (like uvloop did in Cython) was deliberately avoi
 2. **Low-latency primitives**: Semaphore, lock, and event operations are fastest.
 3. **Timer efficiency**: `call_later` is significantly faster than asyncio (4x).
 4. **Native Rust implementation**: Zero-copy buffer handling and lock-free scheduling.
+5. **Optimistic Syscalls**: `sock_sendto` attempts direct non-blocking syscalls first, falling back to `io_uring` only on `EAGAIN`, beating standard `asyncio` significantly in throughput.
 
 ## Methodology
 

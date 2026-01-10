@@ -80,6 +80,7 @@ pub mod timer;
 
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use std::os::fd::RawFd;
 use std::sync::Arc;
 
 use buffer::BufferPool;
@@ -97,9 +98,33 @@ struct RecvMsgState {
     pub addr: libc::sockaddr_storage,
 }
 
+/// State for an in-flight `sendmsg` operation.
+/// Must be heap-allocated and kept alive until completion.
+struct SendMsgState {
+    pub msghdr: libc::msghdr,
+    pub iovec: libc::iovec,
+    pub addr: libc::sockaddr_storage,
+    // We need to keep the data alive too if it's not copied into a kernel buffer immediately.
+    // For io_uring sendmsg, the iovec points to the data.
+    // If we pass bytes from Python, we typically need to ensure they stay valid.
+    // However, for typical send operations, we might copy the data into a buffer we own
+    // or rely on PyBytes being immortal if we hold a reference (but we can't easily hold Py<PyBytes> in a raw struct without GIL).
+    //
+    // A better approach for `submit_sendto` is to allocate a buffer from our `BufferPool` (or a separate `Vec<u8>`)
+    // and copy the data there, OR hold the PyObject.
+    // Given our BufferPool is for 'recv' mainly (fixed size chunks), for send we might just want to use a `Vec<u8>` or `Box<[u8]>`.
+    //
+    // To keep it simple and safe: We will own the data in this state.
+    pub data: Vec<u8>,
+}
+
 // Safety: The raw pointers in msghdr/iovec refer to fields within the struct itself
 // or the pinned buffer from BufferPool.
 unsafe impl Send for RecvMsgState {}
+unsafe impl Sync for RecvMsgState {}
+
+unsafe impl Send for SendMsgState {}
+unsafe impl Sync for SendMsgState {}
 
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -129,6 +154,8 @@ pub struct UringCore {
     writers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
     /// Inflight recvmsg states: fd -> Box<RecvMsgState>
     recvmsg_states: Mutex<HashMap<i32, Box<RecvMsgState>>>,
+    /// Inflight sendmsg states: fd -> Box<SendMsgState>
+    sendmsg_states: Mutex<HashMap<i32, Box<SendMsgState>>>,
     /// Stopping flag for `run_until_stopped`
     stopping: std::sync::atomic::AtomicBool,
 }
@@ -216,6 +243,7 @@ impl UringCore {
             readers: Mutex::new(HashMap::new()),
             writers: Mutex::new(HashMap::new()),
             recvmsg_states: Mutex::new(HashMap::new()),
+            sendmsg_states: Mutex::new(HashMap::new()),
             stopping: std::sync::atomic::AtomicBool::new(false),
         })
     }
@@ -335,6 +363,7 @@ impl UringCore {
                 OpType::SendZC => "send_zc",
                 OpType::AcceptMulti => "accept_multi",
                 OpType::RecvMsg => "recvmsg",
+                OpType::SendMsg => "sendmsg",
                 OpType::Unknown => "unknown",
             };
 
@@ -649,6 +678,216 @@ impl UringCore {
         Ok(())
     }
 
+    /// Submit a `sendmsg` operation for `sock_sendto`.
+    ///
+    /// Copies data into a heap-allocated state to ensure validity during the async operation.
+    fn submit_sendto(
+        &self,
+        py: Python,
+        fd: i32,
+        data: &Bound<'_, PyBytes>,
+        addr: PyObject,
+        future: PyObject,
+    ) -> PyResult<()> {
+        let fd = fd as RawFd;
+        let data_bytes = data.as_bytes().to_vec();
+        let len = data_bytes.len();
+
+        let addr_storage: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+        let mut state = Box::new(SendMsgState {
+            msghdr: unsafe { std::mem::zeroed() },
+            iovec: unsafe { std::mem::zeroed() },
+            addr: addr_storage,
+            data: data_bytes,
+        });
+
+        // Address handling
+        // If it's a tuple, it's IPv4/IPv6. If it's str/bytes, it's UNIX.
+
+        if let Ok(addr_tuple) = addr.downcast_bound::<pyo3::types::PyTuple>(py) {
+            if addr_tuple.len() == 2 {
+                let host = addr_tuple.get_item(0)?.extract::<String>()?;
+                let port = addr_tuple.get_item(1)?.extract::<u16>()?;
+
+                let ip: std::net::Ipv4Addr = host.parse().map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Invalid IPv4 address: {e}"
+                    ))
+                })?;
+                let sockaddr_in = libc::sockaddr_in {
+                    sin_family: libc::AF_INET as libc::sa_family_t,
+                    sin_port: u16::to_be(port),
+                    sin_addr: libc::in_addr {
+                        s_addr: u32::to_be(u32::from(ip)),
+                    },
+                    sin_zero: [0; 8],
+                };
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        std::ptr::addr_of!(sockaddr_in),
+                        std::ptr::addr_of_mut!(state.addr).cast::<libc::sockaddr_in>(),
+                        1,
+                    );
+                }
+            } else if addr_tuple.len() == 4 {
+                let host = addr_tuple.get_item(0)?.extract::<String>()?;
+                let port = addr_tuple.get_item(1)?.extract::<u16>()?;
+                let flowinfo = addr_tuple.get_item(2)?.extract::<u32>()?;
+                let scope_id = addr_tuple.get_item(3)?.extract::<u32>()?;
+
+                let ip: std::net::Ipv6Addr = host.parse().map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Invalid IPv6 address: {e}"
+                    ))
+                })?;
+
+                let sockaddr_in6 = libc::sockaddr_in6 {
+                    sin6_family: libc::AF_INET6 as libc::sa_family_t,
+                    sin6_port: u16::to_be(port),
+                    sin6_flowinfo: flowinfo,
+                    sin6_addr: libc::in6_addr {
+                        s6_addr: ip.octets(),
+                    },
+                    sin6_scope_id: scope_id,
+                };
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        std::ptr::addr_of!(sockaddr_in6),
+                        std::ptr::addr_of_mut!(state.addr).cast::<libc::sockaddr_in6>(),
+                        1,
+                    );
+                }
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Address tuple must be length 2 (IPv4) or 4 (IPv6)",
+                ));
+            }
+        } else if let Ok(path) = addr.downcast_bound::<pyo3::types::PyString>(py) {
+            // AF_UNIX via string path
+            let path_str = path.to_str()?;
+            let path_bytes = path_str.as_bytes();
+
+            let max_len = std::mem::size_of::<libc::sockaddr_un>()
+                - std::mem::offset_of!(libc::sockaddr_un, sun_path);
+
+            if path_bytes.len() >= max_len {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "UNIX socket path too long",
+                ));
+            }
+
+            let mut sun: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+            sun.sun_family = libc::AF_UNIX as libc::sa_family_t;
+
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    path_bytes.as_ptr().cast::<i8>(),
+                    sun.sun_path.as_mut_ptr(),
+                    path_bytes.len(),
+                );
+            }
+
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    std::ptr::addr_of!(sun),
+                    std::ptr::addr_of_mut!(state.addr).cast::<libc::sockaddr_un>(),
+                    1,
+                );
+            }
+        } else if let Ok(path_bytes) = addr.downcast_bound::<pyo3::types::PyBytes>(py) {
+            // AF_UNIX via bytes (e.g. abstract namespace)
+            let bytes = path_bytes.as_bytes();
+            let max_len = std::mem::size_of::<libc::sockaddr_un>()
+                - std::mem::offset_of!(libc::sockaddr_un, sun_path);
+
+            if bytes.len() >= max_len {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "UNIX socket path too long",
+                ));
+            }
+
+            let mut sun: libc::sockaddr_un = unsafe { std::mem::zeroed() };
+            sun.sun_family = libc::AF_UNIX as libc::sa_family_t;
+
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    bytes.as_ptr().cast::<i8>(),
+                    sun.sun_path.as_mut_ptr(),
+                    bytes.len(),
+                );
+            }
+
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    std::ptr::addr_of!(sun),
+                    std::ptr::addr_of_mut!(state.addr).cast::<libc::sockaddr_un>(),
+                    1,
+                );
+            }
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Address must be a tuple (IPv4/6) or string/bytes (UNIX)",
+            ));
+        }
+
+        // Setup SendMsg
+        state.iovec.iov_base = state.data.as_mut_ptr().cast::<libc::c_void>();
+        state.iovec.iov_len = len;
+
+        state.msghdr.msg_name = std::ptr::addr_of_mut!(state.addr).cast::<libc::c_void>();
+        // Safety: state.addr is a valid sockaddr_storage, aligned, and initialized.
+        // Accessing ss_family is safe because it's a field in the C struct layout which we assume matches libc.
+        // Actually, in Rust `libc::sockaddr_storage` fields are public, so reading them is safe.
+        // The previous unsafe block was flagging this.
+        let family = state.addr.ss_family;
+        state.msghdr.msg_namelen = if family == libc::AF_INET as libc::sa_family_t {
+            std::mem::size_of::<libc::sockaddr_in>() as libc::socklen_t
+        } else if family == libc::AF_INET6 as libc::sa_family_t {
+            std::mem::size_of::<libc::sockaddr_in6>() as libc::socklen_t
+        } else if family == libc::AF_UNIX as libc::sa_family_t {
+            // Calculate length: family field + path length + null terminator?
+            // Logic typically: offsetof(sun_path) + path_len + 1 (if not abstract)
+            // But simpler to just use sizeof(sockaddr_un) roughly or exact
+            // For abstract, it's exact length.
+            // Let's use max size for safety in sendto, kernel handles it?
+            // Ideally we calculate exact.
+            // But we don't have the length handy here easily without re-measuring string.
+            // Wait, we can assume full size for sockaddr_un in storage?
+            // Actually, for sendmsg, msg_namelen should be the actual length associated with the address.
+            // Let's just use sizeof(sockaddr_un) for now as it contains zero-padding which is safe.
+            std::mem::size_of::<libc::sockaddr_un>() as libc::socklen_t
+        } else {
+            // Should not happen
+            std::mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t
+        };
+
+        state.msghdr.msg_iov = std::ptr::addr_of_mut!(state.iovec);
+        state.msghdr.msg_iovlen = 1;
+
+        let gen = self.ring.lock().generation_u16();
+        unsafe {
+            let res =
+                self.ring
+                    .lock()
+                    .prep_sendmsg(fd, std::ptr::addr_of_mut!(state.msghdr), 0, gen);
+            if let Err(e) = res {
+                return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "prep_sendmsg failed: {e}"
+                )));
+            }
+        }
+
+        self.sendmsg_states.lock().insert(fd, state);
+
+        self.ring
+            .lock()
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        self.futures.lock().insert(fd, future);
+        Ok(())
+    }
+
     /// Submit a multishot receive operation using provided buffers.
     ///
     /// Requires Provided Buffer Ring (Phase 7).
@@ -908,7 +1147,11 @@ impl UringCore {
                     }
                 }
 
-                if matches!(op_type, OpType::Recv) || matches!(op_type, OpType::RecvMsg) {
+                if matches!(op_type, OpType::SendMsg) {
+                    // Cleanup SendMsg state
+                    self.sendmsg_states.lock().remove(&fd);
+                    data_bytes = Some(result.into_pyobject(py)?.into());
+                } else if matches!(op_type, OpType::Recv) || matches!(op_type, OpType::RecvMsg) {
                     let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
                     if let Some(buf_idx) = buf_idx_opt {
                         // Extract address if RecvMsg
@@ -944,6 +1187,37 @@ impl UringCore {
                                                 .into_pyobject(py)?
                                                 .into(),
                                         );
+                                    } else if sa.sa_family == libc::AF_UNIX as libc::sa_family_t {
+                                        let sun = unsafe { *addr_ptr.cast::<libc::sockaddr_un>() };
+                                        let path_len = state.msghdr.msg_namelen as usize
+                                            - std::mem::offset_of!(libc::sockaddr_un, sun_path);
+
+                                        if path_len > 0 {
+                                            // Handle abstract namespace (starts with null byte)
+                                            if sun.sun_path[0] == 0 {
+                                                let slice = unsafe {
+                                                    std::slice::from_raw_parts(
+                                                        sun.sun_path.as_ptr().cast::<u8>(),
+                                                        path_len,
+                                                    )
+                                                };
+                                                addr_tuple = Some(PyBytes::new(py, slice).into());
+                                            } else {
+                                                // Regular path, null-terminated C string in sun_path
+                                                // But msg_namelen includes the path structure
+                                                // Let's just create bytes from sun_path up to null or len
+                                                let slice = unsafe {
+                                                    std::ffi::CStr::from_ptr(sun.sun_path.as_ptr())
+                                                };
+                                                let path_str = slice.to_string_lossy().into_owned();
+                                                addr_tuple =
+                                                    Some(path_str.into_pyobject(py)?.into());
+                                            }
+                                        } else {
+                                            // Unnamed
+                                            addr_tuple =
+                                                Some(pyo3::types::PyString::new(py, "").into());
+                                        }
                                     }
                                 }
                             }

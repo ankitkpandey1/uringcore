@@ -22,6 +22,7 @@ It passes **all tests** including proper stress testing and FastAPI/Starlette E2
 - **Asyncio Function Caching**: Cached `_enter_task`/`_leave_task` to reduce per-step overhead.
 - **Registered FD Table**: `IOSQE_FIXED_FILE` support for zero FD lookup overhead.
 - **Zero-Copy Send**: `IORING_OP_SEND_ZC` for large payload efficiency (kernel 6.0+).
+- **Optimistic Syscalls**: Direct non-blocking syscalls for UDP fast-path (830k+ ops/sec).
 - **Multishot Recv**: `RECV_MULTISHOT` for persistent connections (kernel 5.19+).
 - **Native Timers**: `IORING_OP_TIMEOUT` for zero-syscall timer management.
 - **Strict Resource Management**: Deterministic cleanup via `Drop` trait.

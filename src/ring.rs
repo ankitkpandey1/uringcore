@@ -103,6 +103,8 @@ pub enum OpType {
     SendZC = 7,
     /// SOTA: Multishot accept (kernel 5.19+)
     AcceptMulti = 8,
+    /// Receive message (recvmsg)
+    RecvMsg = 9,
     /// Unknown operation
     Unknown = 255,
 }
@@ -121,6 +123,7 @@ impl OpType {
             6 => Self::RecvMulti,
             7 => Self::SendZC,
             8 => Self::AcceptMulti,
+            9 => Self::RecvMsg,
             _ => Self::Unknown,
         }
     }
@@ -138,6 +141,7 @@ impl OpType {
             Self::RecvMulti => "recv_multi",
             Self::SendZC => "send_zc",
             Self::AcceptMulti => "accept_multi",
+            Self::RecvMsg => "recvmsg",
             Self::Unknown => "unknown",
         }
     }
@@ -795,6 +799,39 @@ impl Ring {
                 sq.push(&entry)
                     .map_err(|_| Error::RingOp("push recv_multi failed".into()))
             }
+        })
+    }
+
+    /// Prepare a recvmsg operation.
+    ///
+    /// # Safety
+    ///
+    /// The msghdr must remain valid until completion.
+    pub unsafe fn prep_recvmsg(
+        &mut self,
+        fd: RawFd,
+        msg: *mut libc::msghdr,
+        _buf_idx: u16,
+        generation: u16,
+    ) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::RecvMsg, generation);
+
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::RecvMsg::new(types::Fixed(idx), msg)
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::RecvMsg::new(types::Fd(fd), msg)
+                .build()
+                .user_data(user_data)
+        };
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            sq.push(&entry)
+                .map_err(|_| Error::RingOp("push recvmsg failed".into()))
         })
     }
 

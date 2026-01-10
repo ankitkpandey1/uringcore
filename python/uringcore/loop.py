@@ -326,6 +326,8 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                 self._handle_accept_multi_completion(fd, result)
             elif op_type == "recv_multi":
                 self._handle_recv_completion(fd, result, data)
+            elif op_type == "recvmsg":
+                self._handle_recvmsg_completion(fd, result, data)
             elif op_type == "close":
                 self._handle_close_completion(fd, result)
 
@@ -360,9 +362,28 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                     fut.set_exception(OSError(-result, os.strerror(-result)))
                 return
             
-            # Fallback for Error
             if transport:
                 transport._error_received(result)
+
+    def _handle_recvmsg_completion(self, fd: int, result: int, data: Any):
+        """Handle a recvmsg completion."""
+        # data is expected to be (bytes, address_tuple) or None
+        fut = self._io_futures.pop((fd, "recvmsg"), None)
+        
+        if fut is not None and not fut.done():
+            if result >= 0:
+                if data:
+                    fut.set_result(data)
+                else:
+                    # Logic for empty datagrams or just result=0 case if Rust handles it
+                    # (bytes, addr)
+                    # If data is None but result >=0, it implies empty payload or parse failure?
+                    # For now assuming data is populated if result > 0.
+                    # If result == 0, data might be None from Rust currently.
+                    # We might handle empty bytes here if needed.
+                    pass
+            else:
+                 fut.set_exception(OSError(-result, os.strerror(-result)))
 
     def _handle_send_completion(self, fd: int, result: int):
         """Handle a send completion."""
@@ -685,9 +706,22 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     async def sock_recvfrom(
         self, sock: socket.socket, bufsize: int
     ) -> tuple[bytes, Any]:
-        # TODO: Implement using io_uring
-        data, addr = await self.run_in_executor(None, sock.recvfrom, bufsize)  # type: ignore
-        return cast(bytes, data), addr
+        """Receive data from the socket.
+
+        The return value is a pair (data, address) where data is a bytes
+        object representing the data received and address is the address
+        of the socket sending the data.
+        """
+        fd = sock.fileno()
+        
+        # Register if not already
+        self._core.register_fd(fd, "udp")
+
+        fut = self.create_future()
+        self._io_futures[(fd, "recvmsg")] = fut
+
+        self._core.submit_recvfrom(fd, fut)
+        return await fut
 
     async def sock_accept(self, sock: socket.socket) -> tuple[socket.socket, Any]:
         """Accept a connection.

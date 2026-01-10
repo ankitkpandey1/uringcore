@@ -89,6 +89,18 @@ use scheduler::Scheduler;
 use state::{FDStateManager, SocketType};
 use timer::TimerHeap;
 
+/// State for an in-flight `recvmsg` operation.
+/// Must be heap-allocated and kept alive until completion.
+struct RecvMsgState {
+    pub msghdr: libc::msghdr,
+    pub iovec: libc::iovec,
+    pub addr: libc::sockaddr_storage,
+}
+
+// Safety: The raw pointers in msghdr/iovec refer to fields within the struct itself
+// or the pinned buffer from BufferPool.
+unsafe impl Send for RecvMsgState {}
+
 use parking_lot::Mutex;
 use std::collections::HashMap;
 
@@ -115,6 +127,8 @@ pub struct UringCore {
     readers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
     /// Writer callbacks: fd -> (callback, args)
     writers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
+    /// Inflight recvmsg states: fd -> Box<RecvMsgState>
+    recvmsg_states: Mutex<HashMap<i32, Box<RecvMsgState>>>,
     /// Stopping flag for `run_until_stopped`
     stopping: std::sync::atomic::AtomicBool,
 }
@@ -201,6 +215,7 @@ impl UringCore {
             pbuf_ring,
             readers: Mutex::new(HashMap::new()),
             writers: Mutex::new(HashMap::new()),
+            recvmsg_states: Mutex::new(HashMap::new()),
             stopping: std::sync::atomic::AtomicBool::new(false),
         })
     }
@@ -319,6 +334,7 @@ impl UringCore {
                 OpType::RecvMulti => "recv_multi",
                 OpType::SendZC => "send_zc",
                 OpType::AcceptMulti => "accept_multi",
+                OpType::RecvMsg => "recvmsg",
                 OpType::Unknown => "unknown",
             };
 
@@ -537,6 +553,94 @@ impl UringCore {
         }
 
         // Flush to kernel
+        self.ring
+            .lock()
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Submit a recvfrom (recvmsg) operation for a file descriptor.
+    fn submit_recvfrom(&self, fd: i32, future: PyObject) -> PyResult<()> {
+        // Check backpressure/paused
+        if !self.fd_states.should_submit_recv(fd) {
+            return Ok(());
+        }
+
+        // Acquire buffer
+        let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available for recvfrom")
+        })?;
+
+        // Get buffer pointer and size
+        let buf_ptr = unsafe {
+            self.buffer_pool
+                .get_buffer_ptr(buf_idx)
+                .cast::<libc::c_void>()
+        };
+        // Buffer size is 64KB which fits in u32
+        #[allow(clippy::cast_possible_truncation)]
+        let buf_len = self.buffer_pool.buffer_size() as u32;
+
+        self.fd_states
+            .with_state_mut(fd, state::FDState::on_submit)
+            .map_err(|e| {
+                self.buffer_pool
+                    .release(buf_idx, self.buffer_pool.generation_id());
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+            })?;
+
+        self.futures.lock().insert(fd, future);
+
+        // Prepare RecvMsgState
+        let mut state = Box::new(RecvMsgState {
+            msghdr: unsafe { std::mem::zeroed() },
+            iovec: libc::iovec {
+                iov_base: buf_ptr,
+                iov_len: buf_len as usize,
+            },
+            addr: unsafe { std::mem::zeroed() },
+        });
+
+        // Setup msghdr
+        state.msghdr.msg_name = std::ptr::addr_of_mut!(state.addr).cast::<libc::c_void>();
+        state.msghdr.msg_namelen = std::mem::size_of::<libc::sockaddr_storage>() as libc::socklen_t;
+        state.msghdr.msg_iov = std::ptr::addr_of_mut!(state.iovec);
+        state.msghdr.msg_iovlen = 1;
+
+        // Submit to ring
+        let gen = self.ring.lock().generation_u16();
+        unsafe {
+            let res = self.ring.lock().prep_recvmsg(
+                fd,
+                std::ptr::addr_of_mut!(state.msghdr),
+                buf_idx,
+                gen,
+            );
+            if let Err(e) = res {
+                self.buffer_pool
+                    .release(buf_idx, self.buffer_pool.generation_id());
+                self.futures.lock().remove(&fd);
+                return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>((
+                    format!("prep_recvmsg failed: {e}"),
+                )));
+            }
+        }
+
+        // Store state to keep it alive
+        self.recvmsg_states.lock().insert(fd, state);
+
+        // Track inflight buffer
+        {
+            let mut inflight = self.inflight_recv_buffers.lock();
+            if let Some(old_buf_idx) = inflight.insert(fd, buf_idx) {
+                self.buffer_pool
+                    .release(old_buf_idx, self.buffer_pool.generation_id());
+            }
+        }
+
+        // Flush
         self.ring
             .lock()
             .submit()
@@ -804,16 +908,59 @@ impl UringCore {
                     }
                 }
 
-                if matches!(op_type, OpType::Recv) {
+                if matches!(op_type, OpType::Recv) || matches!(op_type, OpType::RecvMsg) {
                     let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
                     if let Some(buf_idx) = buf_idx_opt {
+                        // Extract address if RecvMsg
+
+                        // Extract address if RecvMsg
+                        let mut addr_tuple: Option<PyObject> = None;
+
+                        if matches!(op_type, OpType::RecvMsg) {
+                            let state_opt = self.recvmsg_states.lock().remove(&fd);
+                            if let Some(state) = state_opt {
+                                if result > 0 {
+                                    // Parse sockaddr
+                                    // Assuming IPv4/IPv6 for now
+                                    // TODO: Handle UNIX paths
+                                    let addr_ptr = std::ptr::addr_of!(state.addr);
+                                    let sa = unsafe { &*addr_ptr.cast::<libc::sockaddr>() };
+
+                                    if sa.sa_family == libc::AF_INET as libc::sa_family_t {
+                                        let sin = unsafe { *addr_ptr.cast::<libc::sockaddr_in>() };
+                                        let ip_u32 = u32::from_be(sin.sin_addr.s_addr);
+                                        let ip = std::net::Ipv4Addr::from(ip_u32).to_string();
+                                        let port = u16::from_be(sin.sin_port);
+                                        addr_tuple = Some((ip, port).into_pyobject(py)?.into());
+                                    } else if sa.sa_family == libc::AF_INET6 as libc::sa_family_t {
+                                        let sin6 =
+                                            unsafe { *addr_ptr.cast::<libc::sockaddr_in6>() };
+                                        let ip_u128 = u128::from_be_bytes(sin6.sin6_addr.s6_addr);
+                                        let ip = std::net::Ipv6Addr::from(ip_u128).to_string();
+                                        let port = u16::from_be(sin6.sin6_port);
+                                        // IPv6 tuple: (host, port, flowinfo, scopeid)
+                                        addr_tuple = Some(
+                                            (ip, port, sin6.sin6_flowinfo, sin6.sin6_scope_id)
+                                                .into_pyobject(py)?
+                                                .into(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
                         if result > 0 {
                             // Extract data
                             let len = result as usize;
-                            // Correct safety: get buffer slice, copy to Python bytes
                             unsafe {
                                 let slice = self.buffer_pool.get_buffer_slice(buf_idx, len);
-                                data_bytes = Some(pyo3::types::PyBytes::new(py, slice).into());
+                                let bytes = pyo3::types::PyBytes::new(py, slice);
+                                // If we have an address, we return a tuple (bytes, address) as data
+                                if let Some(addr) = addr_tuple {
+                                    data_bytes = Some((bytes, addr).into_pyobject(py)?.into());
+                                } else {
+                                    data_bytes = Some(bytes.into());
+                                }
                             }
                         }
                         self.buffer_pool
@@ -882,6 +1029,7 @@ impl UringCore {
                         // Success
                         if matches!(op_type, OpType::Recv)
                             || matches!(op_type, OpType::RecvMulti)
+                            || matches!(op_type, OpType::RecvMsg)
                         {
                             if let Some(bytes) = data_bytes {
                                 if let Ok(uring_fut) =

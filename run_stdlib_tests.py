@@ -18,6 +18,7 @@ def run_tests():
     # We can load it using unittest
     print("Loading test.test_asyncio...")
     
+
     # Python 3.13 location might differ slightly or require strict module naming
     try:
         from test import test_asyncio
@@ -25,12 +26,23 @@ def run_tests():
         print("Could not import test.test_asyncio. Are you on a standard Python install?")
         return
 
-    # Create a test suite
-    suite = unittest.TestLoader().loadTestsFromModule(test_asyncio)
+    # Check if test_asyncio is a package or module
+    if hasattr(test_asyncio, "__path__"):
+        # It's a package, load all tests from it
+        print(f"Discovered test_asyncio package at {test_asyncio.__path__}")
+        suite = unittest.TestLoader().discover(
+            start_dir=test_asyncio.__path__[0],
+            pattern="test_*.py",
+            top_level_dir=os.path.dirname(test_asyncio.__path__[0])
+        )
+    else:
+        # It's a single module
+        suite = unittest.TestLoader().loadTestsFromModule(test_asyncio)
     
     # Run it
     print("Running asyncio stdlib tests with uringcore...")
-    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
     
     if not result.wasSuccessful():
         sys.exit(1)

@@ -62,16 +62,6 @@ strace -c python3 benchmarks/syscall_bench.py uringcore
 strace -c python3 benchmarks/syscall_bench.py uvloop
 ```
 
-### Why is uringcore slower than uvloop on gather(100)?
-(139µs vs 105µs)
-
-**Root Cause**: Architectural decision to use standard `asyncio.Task`.
-- **uvloop**: Re-implements `Task` and `Future` completely in C. When a task yields, uvloop stays in C-land to schedule the next one.
-- **uringcore**: Uses Python's standard `asyncio.Task` for **100% ecosystem compatibility**. Every task step requires control to pass from Rust -> Python Interpreter -> Python Task Object -> Rust.
-
-**Architectural Decision**: 
-Re-implementing `Task` in Rust was deliberately avoided for V1.0. This maintains compatibility with tools that inspect `asyncio.Task` (debuggers, `nest_asyncio`, etc.) and avoids massive complexity. `uringcore` beats `asyncio` while providing massive I/O scalability (where syscalls matter more than micro-scheduling latency).
-
 ## Introduction
 
 uringcore provides a drop-in replacement for Python's asyncio event loop, built on the io_uring interface available in Linux kernel 5.11+ (with advanced features optimal on 5.19+). The project targets use cases where low-latency I/O and high throughput are critical requirements.

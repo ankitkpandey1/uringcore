@@ -571,7 +571,7 @@ The following state-of-the-art optimizations have been implemented or are availa
 | **Merged Ring Lock** (single lock per run_tick) | ✅ Active | N/A |
 | **Registered FD Table** (`IOSQE_FIXED_FILE`) | ✅ Available | 5.1+ |
 - **Zero-Copy Send (IORING_OP_SEND_ZC)**: Implemented. Available on Kernel 6.0+. Uses `submit_send_zc`.
-- **Zero-Copy SendTo**: Not implemented (Reverted to Copy for stability).
+
 - **Multishot Recv**: Implemented. (Runtime Feature Detection)
 
 ### Available (Runtime Feature Detection)

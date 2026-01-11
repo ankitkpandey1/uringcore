@@ -48,6 +48,7 @@
 #![allow(clippy::type_complexity)]
 // Drop timing is acceptable in our async context
 #![allow(clippy::significant_drop_tightening)]
+#![allow(clippy::collapsible_if)]
 // match is clearer than map_or_else for error handling
 #![allow(clippy::option_if_let_else)]
 // PyO3 methods need self even if unused
@@ -75,7 +76,7 @@ pub mod handle;
 pub mod ring;
 pub mod scheduler;
 pub mod state;
-// pub mod task; // Removed in favor of asyncio.Task implementation
+
 pub mod timer;
 
 use pyo3::prelude::*;
@@ -111,7 +112,7 @@ struct SendMsgState {
     // or rely on PyBytes being immortal if we hold a reference (but we can't easily hold Py<PyBytes> in a raw struct without GIL).
     //
     // A better approach for `submit_sendto` is to allocate a buffer from our `BufferPool` (or a separate `Vec<u8>`)
-    // and copy the data there, OR hold the PyObject.
+    // and copy the data there, OR hold the Py<PyAny>.
     // Given our BufferPool is for 'recv' mainly (fixed size chunks), for send we might just want to use a `Vec<u8>` or `Box<[u8]>`.
     //
     // To keep it simple and safe: We will own the data in this state.
@@ -145,14 +146,14 @@ pub struct UringCore {
     /// Task scheduler for Python callbacks
     scheduler: Scheduler,
     /// Future map for Native Completion (FD -> Future)
-    futures: Mutex<HashMap<i32, PyObject>>,
+    futures: Mutex<HashMap<i32, Py<PyAny>>>,
     /// Provided Buffer Ring
     /// Register a file descriptor for fixed file optimization.
     pbuf_ring: Option<Arc<buf_ring::PBufRing>>,
     /// Reader callbacks: fd -> (callback, args)
-    readers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
+    readers: Mutex<HashMap<i32, (Py<PyAny>, Py<PyAny>)>>,
     /// Writer callbacks: fd -> (callback, args)
-    writers: Mutex<HashMap<i32, (PyObject, PyObject)>>,
+    writers: Mutex<HashMap<i32, (Py<PyAny>, Py<PyAny>)>>,
     /// Inflight recvmsg states: fd -> Box<RecvMsgState>
     recvmsg_states: Mutex<HashMap<i32, Box<RecvMsgState>>>,
     /// Inflight sendmsg states: fd -> Box<SendMsgState>
@@ -344,7 +345,7 @@ impl UringCore {
     ///
     /// Returns a list of tuples: (fd, operation type, result, data).
     #[allow(clippy::cast_sign_loss)]
-    fn drain_completions(&self, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+    fn drain_completions(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         let completions = self.ring.lock().drain_completions();
         let mut results = Vec::with_capacity(completions.len());
 
@@ -528,7 +529,7 @@ impl UringCore {
     ///
     /// Acquires a buffer from the pool and submits a recv operation.
     /// The completion will be delivered via `run_tick` completion processing.
-    fn submit_recv(&self, fd: i32, future: PyObject) -> PyResult<()> {
+    fn submit_recv(&self, fd: i32, future: Py<PyAny>) -> PyResult<()> {
         // Check if FD should accept new submissions
         if !self.fd_states.should_submit_recv(fd) {
             return Ok(()); // Backpressure or paused
@@ -558,11 +559,11 @@ impl UringCore {
         self.futures.lock().insert(fd, future);
 
         // Submit to ring
-        let gen = self.ring.lock().generation_u16();
+        let generation = self.ring.lock().generation_u16();
         unsafe {
             self.ring
                 .lock()
-                .prep_recv(fd, buf_ptr, buf_len, buf_idx, gen)
+                .prep_recv(fd, buf_ptr, buf_len, buf_idx, generation)
                 .map_err(|e| {
                     // Release buffer on error
                     self.buffer_pool
@@ -594,7 +595,7 @@ impl UringCore {
     }
 
     /// Submit a recvfrom (recvmsg) operation for a file descriptor.
-    fn submit_recvfrom(&self, fd: i32, future: PyObject) -> PyResult<()> {
+    fn submit_recvfrom(&self, fd: i32, future: Py<PyAny>) -> PyResult<()> {
         // Check backpressure/paused
         if !self.fd_states.should_submit_recv(fd) {
             return Ok(());
@@ -642,13 +643,13 @@ impl UringCore {
         state.msghdr.msg_iovlen = 1;
 
         // Submit to ring
-        let gen = self.ring.lock().generation_u16();
+        let generation = self.ring.lock().generation_u16();
         unsafe {
             let res = self.ring.lock().prep_recvmsg(
                 fd,
                 std::ptr::addr_of_mut!(state.msghdr),
                 buf_idx,
-                gen,
+                generation,
             );
             if let Err(e) = res {
                 self.buffer_pool
@@ -689,8 +690,8 @@ impl UringCore {
         py: Python,
         fd: i32,
         data: &Bound<'_, PyBytes>,
-        addr: PyObject,
-        future: PyObject,
+        addr: Py<PyAny>,
+        future: Py<PyAny>,
     ) -> PyResult<()> {
         let fd = fd as RawFd;
         let data_bytes = data.as_bytes().to_vec();
@@ -707,7 +708,7 @@ impl UringCore {
         // Address handling
         // If it's a tuple, it's IPv4/IPv6. If it's str/bytes, it's UNIX.
 
-        if let Ok(addr_tuple) = addr.downcast_bound::<pyo3::types::PyTuple>(py) {
+        if let Ok(addr_tuple) = addr.cast_bound::<pyo3::types::PyTuple>(py) {
             if addr_tuple.len() == 2 {
                 let host = addr_tuple.get_item(0)?.extract::<String>()?;
                 let port = addr_tuple.get_item(1)?.extract::<u16>()?;
@@ -765,7 +766,7 @@ impl UringCore {
                     "Address tuple must be length 2 (IPv4) or 4 (IPv6)",
                 ));
             }
-        } else if let Ok(path) = addr.downcast_bound::<pyo3::types::PyString>(py) {
+        } else if let Ok(path) = addr.cast_bound::<pyo3::types::PyString>(py) {
             // AF_UNIX via string path
             let path_str = path.to_str()?;
             let path_bytes = path_str.as_bytes();
@@ -797,7 +798,7 @@ impl UringCore {
                     1,
                 );
             }
-        } else if let Ok(path_bytes) = addr.downcast_bound::<pyo3::types::PyBytes>(py) {
+        } else if let Ok(path_bytes) = addr.cast_bound::<pyo3::types::PyBytes>(py) {
             // AF_UNIX via bytes (e.g. abstract namespace)
             let bytes = path_bytes.as_bytes();
             let max_len = std::mem::size_of::<libc::sockaddr_un>()
@@ -867,12 +868,14 @@ impl UringCore {
         state.msghdr.msg_iov = std::ptr::addr_of_mut!(state.iovec);
         state.msghdr.msg_iovlen = 1;
 
-        let gen = self.ring.lock().generation_u16();
+        let generation = self.ring.lock().generation_u16();
         unsafe {
-            let res =
-                self.ring
-                    .lock()
-                    .prep_sendmsg(fd, std::ptr::addr_of_mut!(state.msghdr), 0, gen);
+            let res = self.ring.lock().prep_sendmsg(
+                fd,
+                std::ptr::addr_of_mut!(state.msghdr),
+                0,
+                generation,
+            );
             if let Err(e) = res {
                 return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                     "prep_sendmsg failed: {e}"
@@ -894,7 +897,7 @@ impl UringCore {
     /// Submit a multishot receive operation using provided buffers.
     ///
     /// Requires Provided Buffer Ring (Phase 7).
-    fn submit_recv_multishot(&self, fd: i32, future: PyObject) -> PyResult<()> {
+    fn submit_recv_multishot(&self, fd: i32, future: Py<PyAny>) -> PyResult<()> {
         let bgid = if let Some(ref pr) = self.pbuf_ring {
             pr.bgid()
         } else {
@@ -903,7 +906,7 @@ impl UringCore {
             ));
         };
 
-        let gen = self.ring.lock().generation_u16();
+        let generation = self.ring.lock().generation_u16();
 
         // Register future
         self.futures.lock().insert(fd, future);
@@ -911,7 +914,7 @@ impl UringCore {
 
         self.ring
             .lock()
-            .prep_recv_multishot(fd, bgid, gen)
+            .prep_recv_multishot(fd, bgid, generation)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         // Submit immediately
@@ -926,7 +929,7 @@ impl UringCore {
     /// Submit a send operation for a file descriptor.
     ///
     /// The data is copied to a buffer and submitted to `io_uring`.
-    fn submit_send(&self, fd: i32, data: &[u8], future: PyObject) -> PyResult<()> {
+    fn submit_send(&self, fd: i32, data: &[u8], future: Py<PyAny>) -> PyResult<()> {
         // Acquire a buffer from the pool
         let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available")
@@ -945,11 +948,11 @@ impl UringCore {
         self.futures.lock().insert(fd, future);
 
         // Submit to ring
-        let gen = self.ring.lock().generation_u16();
+        let generation = self.ring.lock().generation_u16();
         unsafe {
             self.ring
                 .lock()
-                .prep_send(fd, buf_ptr, len, gen)
+                .prep_send(fd, buf_ptr, len, generation)
                 .map_err(|e| {
                     // Release buffer on error
                     self.buffer_pool
@@ -974,12 +977,12 @@ impl UringCore {
     /// Submit an accept operation for a listening socket.
     ///
     /// Uses `ACCEPT_MULTI` for efficient connection handling.
-    fn submit_accept(&self, fd: i32, future: PyObject) -> PyResult<()> {
-        let gen = self.ring.lock().generation_u16();
+    fn submit_accept(&self, fd: i32, future: Py<PyAny>) -> PyResult<()> {
+        let generation = self.ring.lock().generation_u16();
 
         self.futures.lock().insert(fd, future);
 
-        self.ring.lock().prep_accept(fd, gen).map_err(|e| {
+        self.ring.lock().prep_accept(fd, generation).map_err(|e| {
             self.futures.lock().remove(&fd);
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
         })?;
@@ -996,14 +999,14 @@ impl UringCore {
     /// Submit a multishot accept operation.
     #[pyo3(signature = (fd))]
     fn submit_accept_multishot(&self, fd: i32) -> PyResult<()> {
-        let gen = self.ring.lock().generation_u16();
+        let generation = self.ring.lock().generation_u16();
 
         // Note: We don't track a future for multishot accept because it
         // produces a stream of events. The Python loop handles dispatch.
 
         // We use insert to mark that we accept completions for this FD
         // but we don't store a Python future because one doesn't exist yet.
-        // We can store None? No, futures map expects PyObject.
+        // We can store None? No, futures map expects Py<PyAny>.
         // Actually, we probably don't need to put anything in futures map if
         // run_tick logic works for AcceptMulti (OpType::AcceptMulti).
         // run_tick just returns (fd, op, res, data). It doesn't NEED to find a future.
@@ -1012,7 +1015,7 @@ impl UringCore {
 
         self.ring
             .lock()
-            .prep_accept_multishot(fd, gen)
+            .prep_accept_multishot(fd, generation)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         self.ring
@@ -1025,10 +1028,10 @@ impl UringCore {
 
     /// Submit a close operation for a file descriptor.
     fn submit_close(&self, fd: i32) -> PyResult<()> {
-        let gen = self.ring.lock().generation_u16();
+        let generation = self.ring.lock().generation_u16();
         self.ring
             .lock()
-            .prep_close(fd, gen)
+            .prep_close(fd, generation)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         // Flush to kernel
@@ -1050,12 +1053,12 @@ impl UringCore {
     // =========================================================================
 
     /// Push a timer to the heap.
-    fn push_timer(&self, expiration: f64, handle: PyObject) {
+    fn push_timer(&self, expiration: f64, handle: Py<PyAny>) {
         self.timers.push(expiration, handle);
     }
 
     /// Pop all expired timers.
-    fn pop_expired(&self, now: f64) -> Vec<PyObject> {
+    fn pop_expired(&self, now: f64) -> Vec<Py<PyAny>> {
         self.timers.pop_expired(now)
     }
 
@@ -1070,7 +1073,7 @@ impl UringCore {
 
     /// Push a handle to the ready queue.
     #[allow(clippy::needless_pass_by_value)]
-    fn push_task(&self, handle: PyObject) {
+    fn push_task(&self, handle: Py<PyAny>) {
         self.scheduler.push(handle);
     }
 
@@ -1087,7 +1090,7 @@ impl UringCore {
     /// 3. Executes ready tasks
     #[pyo3(signature = (timeout=None))]
     #[allow(unused_variables)]
-    fn run_tick(&self, py: Python<'_>, timeout: Option<f64>) -> PyResult<Vec<PyObject>> {
+    fn run_tick(&self, py: Python<'_>, timeout: Option<f64>) -> PyResult<Vec<Py<PyAny>>> {
         let mut results = Vec::new();
 
         // 1. Process Timers (Native)
@@ -1123,7 +1126,7 @@ impl UringCore {
                 fd: i32,
                 result: i32,
                 op_type: OpType,
-                data_bytes: Option<PyObject>,
+                data_bytes: Option<Py<PyAny>>,
             }
 
             let mut items = Vec::with_capacity(completions.len());
@@ -1136,7 +1139,7 @@ impl UringCore {
                 let op_type = cqe.op_type();
 
                 // Handle buffer release for recv / data extraction
-                let mut data_bytes: Option<PyObject> = None;
+                let mut data_bytes: Option<Py<PyAny>> = None;
 
                 if matches!(op_type, OpType::RecvMulti) {
                     if let Some(buf_idx) = cqe.buffer_index {
@@ -1160,7 +1163,7 @@ impl UringCore {
                         // Extract address if RecvMsg
 
                         // Extract address if RecvMsg
-                        let mut addr_tuple: Option<PyObject> = None;
+                        let mut addr_tuple: Option<Py<PyAny>> = None;
 
                         if matches!(op_type, OpType::RecvMsg) {
                             let state_opt = self.recvmsg_states.lock().remove(&fd);
@@ -1286,9 +1289,7 @@ impl UringCore {
                             std::io::Error::from_raw_os_error(-result).to_string(),
                         ));
 
-                        if let Ok(uring_fut) =
-                            future.downcast_bound::<crate::future::UringFuture>(py)
-                        {
+                        if let Ok(uring_fut) = future.cast_bound::<crate::future::UringFuture>(py) {
                             if let Err(e) = uring_fut.borrow().set_exception_fast(
                                 py,
                                 &self.scheduler,
@@ -1310,7 +1311,7 @@ impl UringCore {
                         {
                             if let Some(bytes) = data_bytes {
                                 if let Ok(uring_fut) =
-                                    future.downcast_bound::<crate::future::UringFuture>(py)
+                                    future.cast_bound::<crate::future::UringFuture>(py)
                                 {
                                     if let Err(e) = uring_fut.borrow().set_result_fast(
                                         py,
@@ -1329,7 +1330,7 @@ impl UringCore {
                             } else {
                                 let empty = pyo3::types::PyBytes::new(py, &[]);
                                 if let Ok(uring_fut) =
-                                    future.downcast_bound::<crate::future::UringFuture>(py)
+                                    future.cast_bound::<crate::future::UringFuture>(py)
                                 {
                                     if let Err(e) = uring_fut.borrow().set_result_fast(
                                         py,
@@ -1348,7 +1349,7 @@ impl UringCore {
                             }
                         } else {
                             if let Ok(uring_fut) =
-                                future.downcast_bound::<crate::future::UringFuture>(py)
+                                future.cast_bound::<crate::future::UringFuture>(py)
                             {
                                 if let Err(e) = uring_fut.borrow().set_result_fast(
                                     py,
@@ -1379,7 +1380,7 @@ impl UringCore {
         let ready_batch = self.scheduler.drain();
 
         for handle in ready_batch {
-            if let Ok(uring_handle) = handle.downcast_bound::<UringHandle>(py) {
+            if let Ok(uring_handle) = handle.cast_bound::<UringHandle>(py) {
                 // Execute timer callback
                 // asyncio.TimerHandle._run() executes the callback
                 if let Err(e) = uring_handle.borrow().execute(py) {
@@ -1387,7 +1388,7 @@ impl UringCore {
                 }
             } else {
                 // Should not happen for timers from our own loop
-                // but handle generic PyObject just in case
+                // but handle generic Py<PyAny> just in case
                 let is_cancelled = match handle.call_method0(py, "cancelled") {
                     Ok(val) => val.is_truthy(py).unwrap_or(false),
                     Err(_) => false, // If no cancelled method, assume not cancelled
@@ -1409,7 +1410,7 @@ impl UringCore {
     // =========================================================================
 
     /// Add a reader callback for a file descriptor.
-    fn add_reader(&self, fd: i32, callback: PyObject, args: PyObject) {
+    fn add_reader(&self, fd: i32, callback: Py<PyAny>, args: Py<PyAny>) {
         self.readers.lock().insert(fd, (callback, args));
     }
 
@@ -1419,7 +1420,7 @@ impl UringCore {
     }
 
     /// Add a writer callback for a file descriptor.
-    fn add_writer(&self, fd: i32, callback: PyObject, args: PyObject) {
+    fn add_writer(&self, fd: i32, callback: Py<PyAny>, args: Py<PyAny>) {
         self.writers.lock().insert(fd, (callback, args));
     }
 
@@ -1477,7 +1478,7 @@ impl UringCore {
             };
 
             // epoll_wait (release GIL during blocking)
-            let nfds = py.allow_threads(|| unsafe {
+            let nfds = py.detach(|| unsafe {
                 libc::epoll_wait(epoll_fd, events.as_mut_ptr(), 64, timeout_ms)
             });
 
@@ -1510,8 +1511,7 @@ impl UringCore {
                                 .map(|(cb, args)| (cb.clone_ref(py), args.clone_ref(py)))
                         };
                         if let Some((callback, args)) = maybe_reader {
-                            if let Ok(args_tuple) = args.downcast_bound::<pyo3::types::PyTuple>(py)
-                            {
+                            if let Ok(args_tuple) = args.cast_bound::<pyo3::types::PyTuple>(py) {
                                 if let Err(e) = callback.call1(py, args_tuple) {
                                     e.print(py);
                                 }
@@ -1528,8 +1528,7 @@ impl UringCore {
                                 .map(|(cb, args)| (cb.clone_ref(py), args.clone_ref(py)))
                         };
                         if let Some((callback, args)) = maybe_writer {
-                            if let Ok(args_tuple) = args.downcast_bound::<pyo3::types::PyTuple>(py)
-                            {
+                            if let Ok(args_tuple) = args.cast_bound::<pyo3::types::PyTuple>(py) {
                                 if let Err(e) = callback.call1(py, args_tuple) {
                                     e.print(py);
                                 }
@@ -1554,7 +1553,7 @@ impl UringCore {
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UringCore>()?;
     m.add_class::<UringHandle>()?;
-    // m.add_class::<task::UringTask>()?; // Removed
+
     m.add_class::<future::UringFuture>()?;
     m.add_class::<handle::UringHandle>()?;
 

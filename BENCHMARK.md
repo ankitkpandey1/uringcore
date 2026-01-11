@@ -21,9 +21,9 @@ This document presents performance benchmarks comparing `uringcore` against stan
 ```
 Benchmark            |      asyncio |       uvloop |    uringcore
 ---------------------------------------------------------------
-sleep(0)             |      173.0µs |      105.0µs |      152.0µs
-gather(100)          |      173.0µs |      105.0µs |      138.9µs
-sock_pair            |       32.5µs |       42.9µs |       35.0µs
+sleep(0)             |        5.0µs |      105.0µs |       3.4µs
+gather(100)          |      165.8µs |      105.0µs |     156.9µs
+sock_pair            |       23.9µs |       42.9µs |      20.0µs
 sock_sendto (UDP)    | ~550k ops/s |    N/A [*]   | ~831k ops/s
 call_later           |       59.6µs |       17.5µs |       13.5µs
 
@@ -32,7 +32,7 @@ call_later           |       59.6µs |       17.5µs |       13.5µs
 
 ## Analysis
 
-### Why is gather(100) slower than uvloop? (153µs vs 105µs)
+### Why is gather(100) slower than uvloop? (157µs vs 105µs)
 
 **Root Cause**: Architectural decision to use standard `asyncio.Task`.
 - **uvloop**: Re-implements `Task` and `Future` completely in C/Cython. When a task yields, uvloop stays in C-land to schedule the next one, bypassing the Python interpreter's overhead for the scheduling logic itself.
@@ -40,13 +40,13 @@ call_later           |       59.6µs |       17.5µs |       13.5µs
 
 **Data**:
 - **Syscall Efficiency**: `uringcore` makes **1,979** syscalls vs `uvloop`'s **52,587** for the `gather(100)` benchmark. This represents **26x greater efficiency** at the system level.
-- **Latency Gap**: The ~48µs gap is purely userspace FFI (Foreign Function Interface) and Python object manipulation overhead.
+- **Latency Gap**: The ~50µs gap is purely userspace FFI (Foreign Function Interface) and Python object manipulation overhead.
 
 **Decision**: 
 Re-implementing `Task` in Rust (like uvloop did in Cython) was deliberately avoided for V1.0. 
-- **Pros**: It would close the 40µs gap.
+- **Pros**: It would close the gap.
 - **Cons**: It would break compatibility with tools that inspect `asyncio.Task` (debuggers, instrumentation, `nest_asyncio`, etc.) and increase complexity massively.
-- **Trade-off**: `uringcore` is faster than `asyncio` (1.13x) and significantly more scalable for real-world I/O (where syscalls matter more than micro-scheduling latency), while maintaining robust compatibility.
+- **Trade-off**: `uringcore` is competitive with `asyncio` (1.06x faster) and significantly more scalable for real-world I/O (where syscalls matter more than micro-scheduling latency), while maintaining robust compatibility.
 
 ### Strengths
 

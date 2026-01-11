@@ -17,11 +17,11 @@
 // len() == 0 is sometimes clearer
 #![allow(clippy::len_zero)]
 
-use io_uring::{opcode, types, IoUring, Submitter};
+use io_uring::{IoUring, Submitter, opcode, types};
 use nix::sys::eventfd::{EfdFlags, EventFd};
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::buffer::BufferPool;
 use crate::error::{Error, Result};
@@ -413,10 +413,12 @@ impl Ring {
         // Let's check if the crate supports it. If not, we use raw register.
         // io-uring crate 0.6+ supports register_buf_ring.
 
-        self.ring
-            .submitter()
-            .register_buf_ring_with_flags(addr, ring_entries, bgid, 0)
-            .map_err(|e| Error::RingOp(format!("register_buf_ring failed: {e}")))?;
+        unsafe {
+            self.ring
+                .submitter()
+                .register_buf_ring_with_flags(addr, ring_entries, bgid, 0)
+                .map_err(|e| Error::RingOp(format!("register_buf_ring failed: {e}")))?;
+        }
 
         self.provided_buf_group_id = Some(bgid);
         Ok(())
@@ -556,8 +558,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push failed".into()))
+            }
         })
     }
 
@@ -589,8 +593,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push failed".into()))
+            }
         })
     }
 
@@ -734,7 +740,7 @@ impl Ring {
     /// Prepare a standalone timeout operation (native timer).
     ///
     /// Returns completion when `deadline_ns` (absolute monotonic time) is reached.
-    /// Use `encode_user_data(timer_id, OpType::Timeout, gen)` for `user_data`.
+    /// Use `encode_user_data(timer_id, OpType::Timeout, generation)` for `user_data`.
     pub fn prep_timeout(&mut self, deadline_ns: u64, user_data: u64) -> Result<()> {
         // Convert nanoseconds to timespec
         #[allow(clippy::cast_possible_truncation)]
@@ -842,8 +848,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push recvmsg failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push recvmsg failed".into()))
+            }
         })
     }
 
@@ -875,8 +883,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push sendmsg failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push sendmsg failed".into()))
+            }
         })
     }
 
@@ -951,8 +961,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push send_zc failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push send_zc failed".into()))
+            }
         })
     }
 
@@ -1025,9 +1037,9 @@ mod tests {
     fn test_user_data_encoding() {
         let fd = 42i32;
         let op = OpType::Recv;
-        let gen = 1u16;
+        let generation = 1u16;
 
-        let user_data = encode_user_data(fd, op, gen);
+        let user_data = encode_user_data(fd, op, generation);
 
         let entry = CompletionEntry {
             user_data,
@@ -1038,7 +1050,7 @@ mod tests {
 
         assert_eq!(entry.fd(), fd);
         assert_eq!(entry.op_type(), OpType::Recv);
-        assert_eq!(entry.generation(), gen);
+        assert_eq!(entry.generation(), generation);
     }
 
     #[test]

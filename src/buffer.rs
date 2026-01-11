@@ -226,7 +226,7 @@ impl BufferPool {
     #[must_use]
     pub unsafe fn get_buffer_ptr(&self, index: u16) -> *mut u8 {
         debug_assert!((index as usize) < self.buffer_count);
-        self.base.as_ptr().add(index as usize * self.buffer_size)
+        unsafe { self.base.as_ptr().add(index as usize * self.buffer_size) }
     }
 
     /// Get a slice view of a buffer.
@@ -237,8 +237,10 @@ impl BufferPool {
     /// and len does not exceed the buffer size.
     #[must_use]
     pub unsafe fn get_buffer_slice(&self, index: u16, len: usize) -> &[u8] {
-        let ptr = self.get_buffer_ptr(index);
-        std::slice::from_raw_parts(ptr, len.min(self.buffer_size))
+        unsafe {
+            let ptr = self.get_buffer_ptr(index);
+            std::slice::from_raw_parts(ptr, len.min(self.buffer_size))
+        }
     }
 
     /// Get a mutable slice view of a buffer for writing.
@@ -250,8 +252,10 @@ impl BufferPool {
     #[must_use]
     #[allow(clippy::mut_from_ref)] // Intentional: raw pointer to mutable slice for FFI
     pub unsafe fn get_buffer_slice_mut(&self, index: u16, len: usize) -> &mut [u8] {
-        let ptr = self.get_buffer_ptr(index).cast::<u8>();
-        std::slice::from_raw_parts_mut(ptr, len.min(self.buffer_size))
+        unsafe {
+            let ptr = self.get_buffer_ptr(index).cast::<u8>();
+            std::slice::from_raw_parts_mut(ptr, len.min(self.buffer_size))
+        }
     }
 
     /// Get the size of each buffer.

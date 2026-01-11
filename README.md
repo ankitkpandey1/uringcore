@@ -91,7 +91,7 @@ The implementation leverages a completion-driven architecture rather than the tr
 
 - Linux kernel 5.11+ (5.19+ recommended for `RECV_MULTI` optimizations)
 - Python 3.10+
-- Rust 1.70+
+- Rust 1.85+ (Edition 2024)
 
 **SQPOLL Mode:** Requires `CAP_SYS_ADMIN` or kernel 5.12+ with unprivileged SQPOLL. SQPOLL often requires elevated privileges and may be unavailable on managed/cloud hosts; uringcore auto-detects SQPOLL capability and falls back to batched `io_uring_enter` when unsupported. This fallback is automatic and requires no configuration.
 

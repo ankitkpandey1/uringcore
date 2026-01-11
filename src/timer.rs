@@ -6,7 +6,7 @@ use std::collections::BinaryHeap;
 #[derive(Debug)]
 struct TimerEntry {
     expiration: f64,
-    handle: PyObject,
+    handle: Py<PyAny>,
 }
 
 impl PartialEq for TimerEntry {
@@ -52,11 +52,11 @@ impl TimerHeap {
         }
     }
 
-    pub fn push(&self, expiration: f64, handle: PyObject) {
+    pub fn push(&self, expiration: f64, handle: Py<PyAny>) {
         self.heap.lock().push(TimerEntry { expiration, handle });
     }
 
-    pub fn pop_expired(&self, now: f64) -> Vec<PyObject> {
+    pub fn pop_expired(&self, now: f64) -> Vec<Py<PyAny>> {
         let mut heap = self.heap.lock();
         let mut expired = Vec::new();
         while let Some(top) = heap.peek() {

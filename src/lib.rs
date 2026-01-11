@@ -97,6 +97,8 @@ struct RecvMsgState {
     pub msghdr: libc::msghdr,
     pub iovec: libc::iovec,
     pub addr: libc::sockaddr_storage,
+    // Own the buffer
+    pub data: Vec<u8>,
 }
 
 /// State for an in-flight `sendmsg` operation.
@@ -105,17 +107,7 @@ struct SendMsgState {
     pub msghdr: libc::msghdr,
     pub iovec: libc::iovec,
     pub addr: libc::sockaddr_storage,
-    // We need to keep the data alive too if it's not copied into a kernel buffer immediately.
-    // For io_uring sendmsg, the iovec points to the data.
-    // If we pass bytes from Python, we typically need to ensure they stay valid.
-    // However, for typical send operations, we might copy the data into a buffer we own
-    // or rely on PyBytes being immortal if we hold a reference (but we can't easily hold Py<PyBytes> in a raw struct without GIL).
-    //
-    // A better approach for `submit_sendto` is to allocate a buffer from our `BufferPool` (or a separate `Vec<u8>`)
-    // and copy the data there, OR hold the Py<PyAny>.
-    // Given our BufferPool is for 'recv' mainly (fixed size chunks), for send we might just want to use a `Vec<u8>` or `Box<[u8]>`.
-    //
-    // To keep it simple and safe: We will own the data in this state.
+    // We own the data to ensure it stays alive during the operation
     pub data: Vec<u8>,
 }
 
@@ -141,6 +133,8 @@ pub struct UringCore {
     fd_states: FDStateManager,
     /// Inflight recv buffers: fd -> `buffer_index` (for completion data extraction)
     inflight_recv_buffers: Mutex<HashMap<i32, u16>>,
+    /// Inflight send buffers: fd -> `Vec<buffer_index>` (to release on completion)
+    inflight_send_buffers: Mutex<HashMap<i32, Vec<u16>>>,
     /// Timer heap for scheduled callbacks
     timers: TimerHeap,
     /// Task scheduler for Python callbacks
@@ -238,6 +232,7 @@ impl UringCore {
             buffer_pool: pool,
             fd_states: FDStateManager::new(),
             inflight_recv_buffers: Mutex::new(HashMap::new()),
+            inflight_send_buffers: Mutex::new(HashMap::new()),
             timers: TimerHeap::new(),
             scheduler: Scheduler::new(),
             futures: Mutex::new(HashMap::new()),
@@ -296,6 +291,14 @@ impl UringCore {
         let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
         if let Some(buf_idx) = buf_idx_opt {
             self.buffer_pool.release(buf_idx, gen_id);
+        }
+
+        // Release any inflight send buffers
+        let buffers_opt = self.inflight_send_buffers.lock().remove(&fd);
+        if let Some(buffers) = buffers_opt {
+            for buf_idx in buffers {
+                self.buffer_pool.release(buf_idx, gen_id);
+            }
         }
 
         // 2. Return any pending buffers from FD state to the pool
@@ -601,28 +604,13 @@ impl UringCore {
             return Ok(());
         }
 
-        // Acquire buffer
-        let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available for recvfrom")
-        })?;
-
-        // Get buffer pointer and size
-        let buf_ptr = unsafe {
-            self.buffer_pool
-                .get_buffer_ptr(buf_idx)
-                .cast::<libc::c_void>()
-        };
-        // Buffer size is 64KB which fits in u32
-        #[allow(clippy::cast_possible_truncation)]
-        let buf_len = self.buffer_pool.buffer_size() as u32;
+        // Allocate buffer
+        let buf_len = self.buffer_pool.buffer_size();
+        let mut data = vec![0u8; buf_len];
 
         self.fd_states
             .with_state_mut(fd, state::FDState::on_submit)
-            .map_err(|e| {
-                self.buffer_pool
-                    .release(buf_idx, self.buffer_pool.generation_id());
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
-            })?;
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         self.futures.lock().insert(fd, future);
 
@@ -630,10 +618,11 @@ impl UringCore {
         let mut state = Box::new(RecvMsgState {
             msghdr: unsafe { std::mem::zeroed() },
             iovec: libc::iovec {
-                iov_base: buf_ptr,
-                iov_len: buf_len as usize,
+                iov_base: data.as_mut_ptr().cast(),
+                iov_len: buf_len,
             },
             addr: unsafe { std::mem::zeroed() },
+            data,
         });
 
         // Setup msghdr
@@ -648,12 +637,10 @@ impl UringCore {
             let res = self.ring.lock().prep_recvmsg(
                 fd,
                 std::ptr::addr_of_mut!(state.msghdr),
-                buf_idx,
+                0, // No buffer group
                 generation,
             );
             if let Err(e) = res {
-                self.buffer_pool
-                    .release(buf_idx, self.buffer_pool.generation_id());
                 self.futures.lock().remove(&fd);
                 return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>((
                     format!("prep_recvmsg failed: {e}"),
@@ -663,15 +650,6 @@ impl UringCore {
 
         // Store state to keep it alive
         self.recvmsg_states.lock().insert(fd, state);
-
-        // Track inflight buffer
-        {
-            let mut inflight = self.inflight_recv_buffers.lock();
-            if let Some(old_buf_idx) = inflight.insert(fd, buf_idx) {
-                self.buffer_pool
-                    .release(old_buf_idx, self.buffer_pool.generation_id());
-            }
-        }
 
         // Flush
         self.ring
@@ -947,6 +925,12 @@ impl UringCore {
 
         self.futures.lock().insert(fd, future);
 
+        // Track inflight buffer for send
+        {
+            let mut inflight = self.inflight_send_buffers.lock();
+            inflight.entry(fd).or_default().push(buf_idx);
+        }
+
         // Submit to ring
         let generation = self.ring.lock().generation_u16();
         unsafe {
@@ -971,9 +955,60 @@ impl UringCore {
         Ok(())
     }
 
-    /// Submit an accept operation for a listening socket.
+    /// Submit a Zero-Copy Send operation (`IORING_OP_SEND_ZC`).
     ///
-    /// Uses `ACCEPT_MULTI` for efficient connection handling.
+    /// Requires kernel 6.0+.
+    fn submit_send_zc(&self, fd: i32, data: &[u8], future: Py<PyAny>) -> PyResult<()> {
+        // Acquire buffer from pool (Required for SendZC to ensure buffer validity)
+        let buf_idx = self.buffer_pool.acquire().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("No buffers available for send_zc")
+        })?;
+
+        // Copy data to buffer
+        let buf_slice = unsafe { self.buffer_pool.get_buffer_slice_mut(buf_idx, data.len()) };
+        buf_slice.copy_from_slice(data);
+
+        // Get buffer pointer
+        let buf_ptr = buf_slice.as_ptr();
+        #[allow(clippy::cast_possible_truncation)]
+        let len = data.len() as u32;
+
+        self.futures.lock().insert(fd, future);
+
+        // Track inflight buffer
+        {
+            let mut inflight = self.inflight_send_buffers.lock();
+            inflight.entry(fd).or_default().push(buf_idx);
+        }
+
+        // Submit to ring
+        let generation = self.ring.lock().generation_u16();
+        unsafe {
+            self.ring
+                .lock()
+                .prep_send_zc(fd, buf_ptr, len, generation)
+                .map_err(|e| {
+                    // Release buffer on error (and remove from inflight?)
+                    let mut inflight = self.inflight_send_buffers.lock();
+                    if let Some(vec) = inflight.get_mut(&fd) {
+                        vec.pop();
+                    }
+                    self.buffer_pool
+                        .release(buf_idx, self.buffer_pool.generation_id());
+                    self.futures.lock().remove(&fd);
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+                })?;
+        }
+
+        // Flush to kernel
+        self.ring
+            .lock()
+            .submit()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(())
+    }
+
     /// Submit an accept operation for a listening socket.
     ///
     /// Uses `ACCEPT_MULTI` for efficient connection handling.
@@ -1157,94 +1192,91 @@ impl UringCore {
                     // Cleanup SendMsg state
                     self.sendmsg_states.lock().remove(&fd);
                     data_bytes = Some(result.into_pyobject(py)?.into());
-                } else if matches!(op_type, OpType::Recv) || matches!(op_type, OpType::RecvMsg) {
+                } else if matches!(op_type, OpType::Send) || matches!(op_type, OpType::SendZC) {
+                    // Cleanup inflight send buffer
+                    let mut inflight = self.inflight_send_buffers.lock();
+                    if let Some(vec) = inflight.get_mut(&fd) {
+                        if let Some(buf_idx) = vec.pop() {
+                            self.buffer_pool
+                                .release(buf_idx, self.buffer_pool.generation_id());
+                        }
+                    }
+                    data_bytes = Some(result.into_pyobject(py)?.into());
+                } else if matches!(op_type, OpType::Recv) {
                     let buf_idx_opt = self.inflight_recv_buffers.lock().remove(&fd);
                     if let Some(buf_idx) = buf_idx_opt {
-                        // Extract address if RecvMsg
-
-                        // Extract address if RecvMsg
-                        let mut addr_tuple: Option<Py<PyAny>> = None;
-
-                        if matches!(op_type, OpType::RecvMsg) {
-                            let state_opt = self.recvmsg_states.lock().remove(&fd);
-                            if let Some(state) = state_opt {
-                                if result > 0 {
-                                    // Parse sockaddr
-                                    // Assuming IPv4/IPv6 for now
-                                    // TODO: Handle UNIX paths
-                                    let addr_ptr = std::ptr::addr_of!(state.addr);
-                                    let sa = unsafe { &*addr_ptr.cast::<libc::sockaddr>() };
-
-                                    if sa.sa_family == libc::AF_INET as libc::sa_family_t {
-                                        let sin = unsafe { *addr_ptr.cast::<libc::sockaddr_in>() };
-                                        let ip_u32 = u32::from_be(sin.sin_addr.s_addr);
-                                        let ip = std::net::Ipv4Addr::from(ip_u32).to_string();
-                                        let port = u16::from_be(sin.sin_port);
-                                        addr_tuple = Some((ip, port).into_pyobject(py)?.into());
-                                    } else if sa.sa_family == libc::AF_INET6 as libc::sa_family_t {
-                                        let sin6 =
-                                            unsafe { *addr_ptr.cast::<libc::sockaddr_in6>() };
-                                        let ip_u128 = u128::from_be_bytes(sin6.sin6_addr.s6_addr);
-                                        let ip = std::net::Ipv6Addr::from(ip_u128).to_string();
-                                        let port = u16::from_be(sin6.sin6_port);
-                                        // IPv6 tuple: (host, port, flowinfo, scopeid)
-                                        addr_tuple = Some(
-                                            (ip, port, sin6.sin6_flowinfo, sin6.sin6_scope_id)
-                                                .into_pyobject(py)?
-                                                .into(),
-                                        );
-                                    } else if sa.sa_family == libc::AF_UNIX as libc::sa_family_t {
-                                        let sun = unsafe { *addr_ptr.cast::<libc::sockaddr_un>() };
-                                        let path_len = state.msghdr.msg_namelen as usize
-                                            - std::mem::offset_of!(libc::sockaddr_un, sun_path);
-
-                                        if path_len > 0 {
-                                            // Handle abstract namespace (starts with null byte)
-                                            if sun.sun_path[0] == 0 {
-                                                let slice = unsafe {
-                                                    std::slice::from_raw_parts(
-                                                        sun.sun_path.as_ptr().cast::<u8>(),
-                                                        path_len,
-                                                    )
-                                                };
-                                                addr_tuple = Some(PyBytes::new(py, slice).into());
-                                            } else {
-                                                // Regular path, null-terminated C string in sun_path
-                                                // But msg_namelen includes the path structure
-                                                // Let's just create bytes from sun_path up to null or len
-                                                let slice = unsafe {
-                                                    std::ffi::CStr::from_ptr(sun.sun_path.as_ptr())
-                                                };
-                                                let path_str = slice.to_string_lossy().into_owned();
-                                                addr_tuple =
-                                                    Some(path_str.into_pyobject(py)?.into());
-                                            }
-                                        } else {
-                                            // Unnamed
-                                            addr_tuple =
-                                                Some(pyo3::types::PyString::new(py, "").into());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
                         if result > 0 {
-                            // Extract data
                             let len = result as usize;
                             unsafe {
                                 let slice = self.buffer_pool.get_buffer_slice(buf_idx, len);
-                                let bytes = pyo3::types::PyBytes::new(py, slice);
-                                // If we have an address, we return a tuple (bytes, address) as data
-                                if let Some(addr) = addr_tuple {
-                                    data_bytes = Some((bytes, addr).into_pyobject(py)?.into());
-                                } else {
-                                    data_bytes = Some(bytes.into());
-                                }
+                                data_bytes = Some(pyo3::types::PyBytes::new(py, slice).into());
                             }
                         }
                         self.buffer_pool
                             .release(buf_idx, self.buffer_pool.generation_id());
+                    }
+                } else if matches!(op_type, OpType::RecvMsg) {
+                    let state_opt = self.recvmsg_states.lock().remove(&fd);
+                    if let Some(state) = state_opt {
+                        let mut addr_tuple: Option<Py<PyAny>> = None;
+
+                        if result > 0 {
+                            // Parse address
+                            let addr_ptr = std::ptr::addr_of!(state.addr);
+                            let sa = unsafe { &*addr_ptr.cast::<libc::sockaddr>() };
+
+                            if sa.sa_family == libc::AF_INET as libc::sa_family_t {
+                                let sin = unsafe { *addr_ptr.cast::<libc::sockaddr_in>() };
+                                let ip_u32 = u32::from_be(sin.sin_addr.s_addr);
+                                let ip = std::net::Ipv4Addr::from(ip_u32).to_string();
+                                let port = u16::from_be(sin.sin_port);
+                                addr_tuple = Some((ip, port).into_pyobject(py)?.into());
+                            } else if sa.sa_family == libc::AF_INET6 as libc::sa_family_t {
+                                let sin6 = unsafe { *addr_ptr.cast::<libc::sockaddr_in6>() };
+                                let ip_u128 = u128::from_be_bytes(sin6.sin6_addr.s6_addr);
+                                let ip = std::net::Ipv6Addr::from(ip_u128).to_string();
+                                let port = u16::from_be(sin6.sin6_port);
+                                addr_tuple = Some(
+                                    (ip, port, sin6.sin6_flowinfo, sin6.sin6_scope_id)
+                                        .into_pyobject(py)?
+                                        .into(),
+                                );
+                            } else if sa.sa_family == libc::AF_UNIX as libc::sa_family_t {
+                                let sun = unsafe { *addr_ptr.cast::<libc::sockaddr_un>() };
+                                let path_len = state.msghdr.msg_namelen as usize
+                                    - std::mem::offset_of!(libc::sockaddr_un, sun_path);
+
+                                if path_len > 0 {
+                                    if sun.sun_path[0] == 0 {
+                                        let slice = unsafe {
+                                            std::slice::from_raw_parts(
+                                                sun.sun_path.as_ptr().cast::<u8>(),
+                                                path_len,
+                                            )
+                                        };
+                                        addr_tuple = Some(PyBytes::new(py, slice).into());
+                                    } else {
+                                        let slice = unsafe {
+                                            std::ffi::CStr::from_ptr(sun.sun_path.as_ptr())
+                                        };
+                                        let path_str = slice.to_string_lossy().into_owned();
+                                        addr_tuple = Some(path_str.into_pyobject(py)?.into());
+                                    }
+                                } else {
+                                    addr_tuple = Some(pyo3::types::PyString::new(py, "").into());
+                                }
+                            }
+
+                            // Extract data
+                            let len = result as usize;
+                            let slice = &state.data[..len];
+                            let bytes = pyo3::types::PyBytes::new(py, slice);
+                            if let Some(addr) = addr_tuple {
+                                data_bytes = Some((bytes, addr).into_pyobject(py)?.into());
+                            } else {
+                                data_bytes = Some(bytes.into());
+                            }
+                        }
                     }
                 }
 
@@ -1319,12 +1351,16 @@ impl UringCore {
                                         bytes,
                                         future,
                                     ) {
-                                        e.print(py);
+                                        if !e.to_string().contains("InvalidStateError") {
+                                            e.print(py);
+                                        }
                                     }
                                 } else {
                                     if let Err(e) = future.call_method1(py, "set_result", (bytes,))
                                     {
-                                        e.print(py);
+                                        if !e.to_string().contains("InvalidStateError") {
+                                            e.print(py);
+                                        }
                                     }
                                 }
                             } else {
@@ -1338,7 +1374,9 @@ impl UringCore {
                                         empty.into(),
                                         future,
                                     ) {
-                                        e.print(py);
+                                        if !e.to_string().contains("InvalidStateError") {
+                                            e.print(py);
+                                        }
                                     }
                                 } else {
                                     if let Err(e) = future.call_method1(py, "set_result", (empty,))

@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     
     steps:
       - uses: actions/checkout@v4
@@ -75,6 +75,14 @@ jobs:
           source .venv/bin/activate
           pytest tests/test_basic.py -v || echo "No unit tests found, skipping"
       
+      - name: Run stdlib tests
+        run: |
+          source .venv/bin/activate
+          # We need to ensure we can import 'test' module which is usually in Lib/test
+          # In many CI environments/installations, test suite might be separate or require specific paths.
+          # For standard python installs it should work if it's installed.
+          python run_stdlib_tests.py
+
       - name: Run e2e tests
         run: |
           source .venv/bin/activate

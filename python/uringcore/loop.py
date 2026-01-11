@@ -187,6 +187,9 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         """Run the event loop until stop() is called."""
         self._check_closed()
         self._check_running()
+        
+        if asyncio._get_running_loop() is not None:
+             raise RuntimeError("Cannot run the event loop while another loop is running")
 
         self._running = True
         self._thread_id = None

@@ -605,7 +605,7 @@ impl UringCore {
         }
 
         // Allocate buffer
-        let buf_len = 65536; // 64KB
+        let buf_len = self.buffer_pool.buffer_size();
         let mut data = vec![0u8; buf_len];
 
         self.fd_states

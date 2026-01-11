@@ -36,16 +36,19 @@ class UringSocketTransport(asyncio.Transport):
         """Get transport extra info."""
         if name == "socket":
             return self._sock
-        if name == "peername":
-            try:
-                return self._sock.getpeername() if self._sock else None
-            except Exception:
-                return None
-        if name == "sockname":
-            try:
-                return self._sock.getsockname() if self._sock else None
-            except Exception:
-                return None
+        
+        if self._sock:
+            if name == "peername":
+                try:
+                    return self._sock.getpeername()
+                except Exception:
+                    pass
+            elif name == "sockname":
+                try:
+                    return self._sock.getsockname()
+                except Exception:
+                    pass
+                    
         return default
 
     def is_closing(self):
@@ -58,8 +61,11 @@ class UringSocketTransport(asyncio.Transport):
             return
         self._closing = True
 
-        # Submit close via io_uring
-        self._loop._core.submit_close(self._fd)
+        if self._sock:
+            self._sock.close()
+        else:
+             # Submit close via io_uring
+             self._loop._core.submit_close(self._fd)
 
     def is_reading(self):
         """Return True if the transport is receiving."""

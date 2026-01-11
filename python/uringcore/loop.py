@@ -36,6 +36,12 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     Completions are delivered via eventfd signaling.
     """
 
+    # Design Decision: Default buffer settings balance memory usage vs throughput.
+    # Larger buffers (8KB) favor standard MTU + overhead, while count (4096)
+    # ensures sufficient depth for high-throughput bursts.
+    DEFAULT_BUFFER_COUNT = 4096
+    DEFAULT_BUFFER_SIZE = 8192
+
     def __init__(self, **kwargs):
         """Initialize the event loop."""
         self._closed = False
@@ -43,21 +49,13 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         self._running = False
         self._task_factory = None
 
-        # Support environment variable configuration for buffer settings
-        # URINGCORE_BUFFER_COUNT: Number of buffers (default: 4096)
-        # URINGCORE_BUFFER_SIZE: Size of each buffer in bytes (default: 8192)
-        env_buffer_count = os.environ.get("URINGCORE_BUFFER_COUNT")
-        env_buffer_size = os.environ.get("URINGCORE_BUFFER_SIZE")
+        # Design Decision: Allow runtime tuning via environment variables to support
+        # containerized deployments without code changes.
+        buffer_count = int(os.environ.get("URINGCORE_BUFFER_COUNT", self.DEFAULT_BUFFER_COUNT))
+        buffer_size = int(os.environ.get("URINGCORE_BUFFER_SIZE", self.DEFAULT_BUFFER_SIZE))
 
-        if env_buffer_count is not None:
-            kwargs.setdefault("buffer_count", int(env_buffer_count))
-        else:
-            kwargs.setdefault("buffer_count", 4096)
-
-        if env_buffer_size is not None:
-            kwargs.setdefault("buffer_size", int(env_buffer_size))
-        else:
-            kwargs.setdefault("buffer_size", 8192)
+        kwargs.setdefault("buffer_count", buffer_count)
+        kwargs.setdefault("buffer_size", buffer_size)
 
         # Initialize the Rust core
         try:
@@ -111,6 +109,20 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
         # Native I/O futures: (fd, op_type) -> Future
         self._io_futures: dict[tuple[int, str], asyncio.Future[Any]] = {}
+
+        # Design Decision: Dispatch Map
+        # Replace if-elif ladder with O(1) dictionary lookup for completion handlers.
+        # This improves maintainability and potentially performance for high-throughput loops.
+        self._completion_handlers = {
+            "recv": self._handle_recv_completion,
+            "recv_multi": self._handle_recv_completion,
+            "send": self._handle_send_completion,
+            "accept": self._handle_accept_completion,
+            "accept_multi": self._handle_accept_multi_completion,
+            "recvmsg": self._handle_recvmsg_completion,
+            "sendmsg": self._handle_sendmsg_completion,
+            "close": self._handle_close_completion,
+        }
 
     # =========================================================================
     # Task Factory support (Abstract Methods)
@@ -314,20 +326,20 @@ class UringEventLoop(asyncio.AbstractEventLoop):
 
     def _process_completions(self, completions):
         """Process completions from the io_uring ring."""
+        # Design Decision: Fast-path dispatch
+        # Using a bound method from the pre-computed dictionary avoids attribute
+        # lookup overhead on every iteration.
+        
+        # Optimization: Local variable access is faster than attribute access
+        handlers = self._completion_handlers
 
         for fd, op_type, result, data in completions:
-            if op_type == "recv":
-                self._handle_recv_completion(fd, result, data)
-            elif op_type == "send":
-                self._handle_send_completion(fd, result)
-            elif op_type == "accept":
-                self._handle_accept_completion(fd, result)
-            elif op_type == "accept_multi":
-                self._handle_accept_multi_completion(fd, result)
-            elif op_type == "recv_multi":
-                self._handle_recv_completion(fd, result, data)
-            elif op_type == "close":
-                self._handle_close_completion(fd, result)
+            handler = handlers.get(op_type)
+            if handler is not None:
+                handler(fd, result, data)
+            else:
+                # Should not happen in normal operation
+                pass
 
     def _handle_recv_completion(self, fd: int, result: int, data: Optional[bytes]):
         """Handle a receive completion."""
@@ -360,11 +372,34 @@ class UringEventLoop(asyncio.AbstractEventLoop):
                     fut.set_exception(OSError(-result, os.strerror(-result)))
                 return
             
-            # Fallback for Error
             if transport:
                 transport._error_received(result)
 
-    def _handle_send_completion(self, fd: int, result: int):
+    def _handle_recvmsg_completion(self, fd: int, result: int, data: Any):
+        """Handle a recvmsg completion."""
+        fut = self._io_futures.pop((fd, "recvmsg"), None)
+        
+        if fut and not fut.done():
+            if result >= 0:
+                # Design Decision: recvmsg returns (bytes, address).
+                # If data is missing but result >= 0, it implies an empty datagram.
+                if data:
+                    fut.set_result(data)
+                else:
+                    fut.set_result((b"", None))
+            else:
+                 fut.set_exception(OSError(-result, os.strerror(-result)))
+
+    def _handle_sendmsg_completion(self, fd: int, result: int, data: Any):
+        """Handle a sendmsg completion."""
+        fut = self._io_futures.pop((fd, "sendmsg"), None)
+        if fut is not None and not fut.done():
+            if result >= 0:
+                fut.set_result(result) 
+            else:
+                 fut.set_exception(OSError(-result, os.strerror(-result)))
+
+    def _handle_send_completion(self, fd: int, result: int, data: Any):
         """Handle a send completion."""
         # Check for direct I/O future
         fut = self._io_futures.pop((fd, "send"), None)
@@ -378,7 +413,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         if transport is not None:
              transport._send_completed(result)
 
-    def _handle_accept_completion(self, fd: int, result: int):
+    def _handle_accept_completion(self, fd: int, result: int, data: Any):
         """Handle an accept completion."""
         fut = self._io_futures.pop((fd, "accept"), None)
 
@@ -406,7 +441,7 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             if fut is not None and not fut.done():
                 fut.set_exception(OSError(-result, os.strerror(-result)))
 
-    def _handle_accept_multi_completion(self, fd: int, result: int):
+    def _handle_accept_multi_completion(self, fd: int, result: int, data: Any):
         """Handle a multishot accept completion."""
         # print(f"DEBUG: AcceptMulti completion fd={fd} result={result}")
         if result >= 0:
@@ -430,15 +465,16 @@ class UringEventLoop(asyncio.AbstractEventLoop):
             # Log other errors?
             pass
 
-    def _handle_close_completion(self, fd: int, result: int):
+    def _handle_close_completion(self, fd: int, result: int, data: Any):
         """Handle a close completion."""
         self._transports.pop(fd, None)
         self._core.unregister_fd(fd)
 
     def _create_transport_for_accepted(self, fd: int, protocol_factory: Callable):
         """Create transport and protocol for an accepted connection."""
-        # Set non-blocking
-        os.set_blocking(fd, False)
+        # Create socket object to wrap FD (ensures close/shutdown works)
+        sock = socket.socket(fileno=fd)
+        sock.setblocking(False)
 
         # Create protocol
         protocol = protocol_factory()
@@ -446,14 +482,14 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         # Create transport
         from uringcore.transport import UringSocketTransport
 
-        transport = UringSocketTransport(self, fd, protocol)
+        transport = UringSocketTransport(self, fd, protocol, sock=sock)
         self._transports[fd] = transport
 
         # Notify protocol
         protocol.connection_made(transport)
 
         # Register FD and start receiving
-        self._core.register_fd(fd, "tcp")
+        self._core.register_fd(fd, "tcp") # "tcp" used for stream sockets generally
         transport._rearm_recv()
 
     # Removed _process_scheduled as it is handled by Rust run_tick
@@ -679,15 +715,74 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         return await self.run_in_executor(None, socket.getnameinfo, sockaddr, flags)
 
     async def sock_sendto(self, sock: socket.socket, data: Any, address: Any) -> int:
-        # TODO: Implement using io_uring
-        return cast(int, await self.run_in_executor(None, sock.sendto, data, address))
+        if self._debug:
+            self._check_socket(sock)
+
+        fd = sock.fileno()
+
+        # Check if we should use io_uring
+        # For small sends, overhead might be higher, but for consistency we use it.
+        # Design Decision: Optimistic Syscall Fast-Path
+        # Attempt direct syscall to bypass io_uring submission overhead for non-blocked sockets.
+        try:
+            return sock.sendto(data, address)
+        except BlockingIOError:
+            pass
+        except OSError as e:
+            raise e
+
+        # Fallback if unsupported address or other potential issues
+        while True:
+            fut = self.create_future()
+            self._io_futures[(fd, "sendmsg")] = fut # Track future type if needed for cancellation
+            
+            try:
+                # We assume data is bytes-like. UringCore expects PyBytes.
+                if not isinstance(data, bytes):
+                     try:
+                         data = bytes(data)
+                     except Exception:
+                         pass # Let submit_sendto handle type error or pass as is 
+    
+                self._core.submit_sendto(fd, data, address, fut)
+                await fut
+                # sendto returns number of bytes sent
+                # Our future result is the number of bytes sent (from cqe.res)
+                return fut.result()
+            except OSError as e:
+                self._io_futures.pop((fd, "sendmsg"), None)
+                if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK, errno.ENOBUFS):
+                    waiter = self.create_future()
+                    self.add_writer(fd, lambda: waiter.done() or waiter.set_result(None))
+                    try:
+                        await waiter
+                    finally:
+                        self.remove_writer(fd)
+                    continue
+                raise e
+            except Exception as e:
+                self._io_futures.pop((fd, "sendmsg"), None)
+                raise e
 
     async def sock_recvfrom(
         self, sock: socket.socket, bufsize: int
     ) -> tuple[bytes, Any]:
-        # TODO: Implement using io_uring
-        data, addr = await self.run_in_executor(None, sock.recvfrom, bufsize)  # type: ignore
-        return cast(bytes, data), addr
+        """Receive data from the socket.
+
+        The return value is a pair (data, address) where data is a bytes
+        object representing the data received and address is the address
+        of the socket sending the data.
+        """
+        fd = sock.fileno()
+        
+        # Register if not already
+        self._core.register_fd(fd, "udp")
+
+        fut = self.create_future()
+        self._io_futures[(fd, "recvmsg")] = fut
+
+        self._core.submit_recvfrom(fd, fut)
+        return await fut
 
     async def sock_accept(self, sock: socket.socket) -> tuple[socket.socket, Any]:
         """Accept a connection.
@@ -1079,59 +1174,45 @@ class UringEventLoop(asyncio.AbstractEventLoop):
         server_hostname: str | None = None,
         ssl_handshake_timeout: float | None = None,
         ssl_shutdown_timeout: float | None = None,
+        **kwargs: Any,
     ) -> tuple[asyncio.Transport, _ProtocolT]:
         """Create a UNIX connection."""
         self._check_closed()
-        # TODO: Implement full UNIX support
-        # The original implementation is commented out or replaced by the super() call
-        # if ssl is not None:
-        #     raise NotImplementedError("SSL not yet supported for Unix sockets")
+        if ssl is not None:
+             raise NotImplementedError("SSL not yet supported for Unix sockets")
 
-        # if sock is None:
-        #     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        #     sock.setblocking(False)
-        #     try:
-        #         sock.connect(path)
-        #     except BlockingIOError:
-        #         pass  # Connection in progress - will complete async
+        if sock is None:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.setblocking(False)
+            try:
+                sock.connect(path)
+            except BlockingIOError:
+                pass 
+            except Exception as e:
+                sock.close()
+                raise e
 
-        # # Wait for connection using add_writer
-        # connected = self.create_future()
+        # Create protocol
+        protocol = protocol_factory()
 
-        # def on_connected():
-        #     self.remove_writer(sock.fileno())
-        #     # Check for connection error
-        #     err = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
-        #     if err:
-        #         connected.set_exception(OSError(err, "Connect failed"))
-        #     else:
-        #         connected.set_result(None)
-
-        # self.add_writer(sock.fileno(), on_connected)
-        # await connected
-
-        # # Create transport and protocol
-        # protocol = protocol_factory()
-
-        # from uringcore.transport import UringSocketTransport
-        # transport = UringSocketTransport(self, sock.fileno(), protocol, sock)
-        # self._transports[sock.fileno()] = transport
-
-        # protocol.connection_made(transport)
-
-        # self._core.register_fd(sock.fileno(), "tcp")
-        # self._core.submit_recv(sock.fileno())
-
-        # return transport, protocol
-        return await super().create_unix_connection(
-            protocol_factory,
-            path,
-            ssl=ssl,
-            sock=sock,
-            server_hostname=server_hostname,
-            ssl_handshake_timeout=ssl_handshake_timeout,
-            ssl_shutdown_timeout=ssl_shutdown_timeout,
-        )
+        # Create transport
+        # We can reuse UringSocketTransport if we support register_fd("unix")
+        from uringcore.transport import UringSocketTransport
+        
+        # Register FD
+        self._core.register_fd(sock.fileno(), "unix")
+        
+        # transport = UringSocketTransport(self, sock.fileno(), protocol, sock, waiter) # INCORRECT
+        transport = UringSocketTransport(self, sock.fileno(), protocol, sock=sock)
+        self._transports[sock.fileno()] = transport
+        
+        protocol.connection_made(transport)
+        
+        # Start recv loop
+        # transport.resume_reading() will call _rearm_recv()
+        transport.resume_reading()
+        
+        return transport, protocol
 
     async def create_unix_server(
         self,
@@ -1147,43 +1228,44 @@ class UringEventLoop(asyncio.AbstractEventLoop):
     ) -> asyncio.Server:
         """Create a UNIX server."""
         self._check_closed()
-        # TODO: Implement full UNIX server support
-        # The original implementation is commented out or replaced by the super() call
-        # if ssl is not None:
-        #     raise NotImplementedError("SSL not yet supported for Unix sockets")
+        
+        import os
+        
+        if sock is not None:
+             if path:
+                 raise ValueError("path and sock cannot be used at the same time")
+             sockets = [sock]
+        else:
+             if not path:
+                 raise ValueError("path must be specified")
+                 
+             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+             sock.setblocking(False)
+             
+             # Unlink if exists
+             try:
+                 os.unlink(path)
+             except FileNotFoundError:
+                 pass
+                 
+             sock.bind(path)
+             sock.listen(backlog)
+             sockets = [sock]
 
-        # import os
-
-        # if sock is not None:
-        #     sockets = [sock]
-        # else:
-        #     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        #     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        #     sock.setblocking(False)
-
-        #     # Remove existing socket file if it exists
-        #     try:
-        #         os.unlink(path)
-        #     except FileNotFoundError:
-        #         pass
-
-        #     sock.bind(path)
-        #     sock.listen(backlog)
-        #     sockets = [sock]
-
-        # # Create server object
-        # from uringcore.server import UringServer
-        # server = UringServer(self, sockets, protocol_factory)
-
-        # # Register with io_uring
-        # for s in sockets:
-        #     fd = s.fileno()
-        #     self._core.register_fd(fd, "unix_listener")
-        #     self._servers[fd] = (server, protocol_factory)
-        #     if start_serving:
-        #         self._core.submit_accept(fd)
-
-        # return server
+        # Create server object
+        from uringcore.server import UringServer
+        server = UringServer(self, sockets, protocol_factory)
+        
+        # Register waiters
+        for s in sockets:
+            fd = s.fileno()
+            self._core.register_fd(fd, "unix_listener")
+            self._servers[fd] = (server, protocol_factory)
+            if start_serving:
+                # Use standard submit_accept
+                self._core.submit_accept(fd, self.create_future())
+        
+        return server
         return await super().create_unix_server(
             protocol_factory,
             path,

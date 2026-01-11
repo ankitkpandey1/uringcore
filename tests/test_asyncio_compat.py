@@ -207,10 +207,11 @@ class TestAsyncioCompatibility:
                 await writer.drain()
                 writer.close()
             
-            server = await asyncio.start_server(handle, '127.0.0.1', 19880)
+            server = await asyncio.start_server(handle, '127.0.0.1', 0)
             await asyncio.sleep(0.05)
             
-            reader, writer = await asyncio.open_connection('127.0.0.1', 19880)
+            port = server.sockets[0].getsockname()[1]
+            reader, writer = await asyncio.open_connection('127.0.0.1', port)
             writer.write(b'hello')
             await writer.drain()
             
@@ -280,13 +281,14 @@ class TestAsyncioCompatibility:
                     self.future.set_result(data)
             
             server, _ = await loop.create_datagram_endpoint(
-                ServerProtocol, local_addr=('127.0.0.1', 19881)
+                ServerProtocol, local_addr=('127.0.0.1', 0)
             )
+            port = server.get_extra_info('socket').getsockname()[1]
             
             future = loop.create_future()
             client, _ = await loop.create_datagram_endpoint(
                 lambda: ClientProtocol(future),
-                remote_addr=('127.0.0.1', 19881)
+                remote_addr=('127.0.0.1', port)
             )
             
             # Use manual wait

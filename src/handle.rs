@@ -1,16 +1,16 @@
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// A handle for a scheduled task.
 #[pyclass(module = "uringcore")]
 pub struct UringHandle {
-    callback: PyObject,
+    callback: Py<PyAny>,
     args: Py<PyTuple>,
     #[allow(dead_code)]
-    loop_: PyObject,
-    context: Option<PyObject>,
+    loop_: Py<PyAny>,
+    context: Option<Py<PyAny>>,
     cancelled: Arc<AtomicBool>,
 }
 
@@ -19,10 +19,10 @@ impl UringHandle {
     #[new]
     #[pyo3(signature = (callback, args, loop_, context=None))]
     fn new(
-        callback: PyObject,
+        callback: Py<PyAny>,
         args: Py<PyTuple>,
-        loop_: PyObject,
-        context: Option<PyObject>,
+        loop_: Py<PyAny>,
+        context: Option<Py<PyAny>>,
     ) -> Self {
         Self {
             callback,
@@ -73,11 +73,10 @@ impl UringHandle {
 
             // To be 100% correct with asyncio, we delegate to context.run.
             // Efficient way:
-            // let run_args = (self.callback.clone(), ) + self.args;
             // ctx.call_method1("run", run_args)
 
             // Using PyTuple::new logic
-            let mut run_args_vec: Vec<PyObject> = Vec::with_capacity(1 + args_ref.len());
+            let mut run_args_vec: Vec<Py<PyAny>> = Vec::with_capacity(1 + args_ref.len());
             run_args_vec.push(self.callback.clone_ref(py));
             for item in args_ref.iter() {
                 run_args_vec.push(item.unbind());
@@ -100,10 +99,10 @@ impl UringHandle {
 
 impl UringHandle {
     pub(crate) fn new_native(
-        callback: PyObject,
+        callback: Py<PyAny>,
         args: Py<PyTuple>,
-        loop_: PyObject,
-        context: Option<PyObject>,
+        loop_: Py<PyAny>,
+        context: Option<Py<PyAny>>,
     ) -> Self {
         Self {
             callback,
@@ -123,7 +122,7 @@ impl UringHandle {
         // Identical to _run but internal, can be inlined or optimized further
         if let Some(ctx) = &self.context {
             let args_ref = self.args.bind(py);
-            let mut run_args_vec: Vec<PyObject> = Vec::with_capacity(1 + args_ref.len());
+            let mut run_args_vec: Vec<Py<PyAny>> = Vec::with_capacity(1 + args_ref.len());
             run_args_vec.push(self.callback.clone_ref(py));
             for item in args_ref.iter() {
                 run_args_vec.push(item.unbind());

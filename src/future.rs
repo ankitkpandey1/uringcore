@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 pub enum FutureState {
     Pending,
-    Finished(PyObject), // Result
-    Failed(PyObject),   // Exception
+    Finished(Py<PyAny>), // Result
+    Failed(Py<PyAny>),   // Exception
     Cancelled,
 }
 
@@ -14,9 +14,9 @@ pub enum FutureState {
 
 #[pyclass(module = "uringcore")]
 pub struct UringFuture {
-    loop_: PyObject,
+    loop_: Py<PyAny>,
     pub state: Arc<Mutex<FutureState>>,
-    pub callbacks: Arc<Mutex<Vec<(PyObject, Option<PyObject>)>>>,
+    pub callbacks: Arc<Mutex<Vec<(Py<PyAny>, Option<Py<PyAny>>)>>>,
     #[allow(dead_code)]
     blocking: bool,
 }
@@ -25,7 +25,7 @@ pub struct UringFuture {
 impl UringFuture {
     #[new]
     #[pyo3(signature = (loop_=None))]
-    fn new(py: Python<'_>, loop_: Option<PyObject>) -> PyResult<Self> {
+    fn new(py: Python<'_>, loop_: Option<Py<PyAny>>) -> PyResult<Self> {
         let loop_ = if let Some(l) = loop_ {
             l
         } else {
@@ -51,7 +51,7 @@ impl UringFuture {
         matches!(*state, FutureState::Cancelled)
     }
 
-    fn result(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn result(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state.lock();
         match &*state {
             FutureState::Pending => Err(PyValueError::new_err("Result is not ready.")),
@@ -65,7 +65,7 @@ impl UringFuture {
         }
     }
 
-    fn exception(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn exception(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state.lock();
         match &*state {
             FutureState::Pending => Err(PyValueError::new_err("Exception is not set.")),
@@ -79,7 +79,7 @@ impl UringFuture {
         }
     }
 
-    fn set_result(slf: Py<Self>, py: Python<'_>, result: PyObject) -> PyResult<()> {
+    fn set_result(slf: Py<Self>, py: Python<'_>, result: Py<PyAny>) -> PyResult<()> {
         let (state, callbacks, loop_) = {
             let refs = slf.borrow(py);
             (
@@ -99,7 +99,7 @@ impl UringFuture {
         Self::_schedule_callbacks(py, callbacks, loop_, slf.into_any())
     }
 
-    fn set_exception(slf: Py<Self>, py: Python<'_>, exception: PyObject) -> PyResult<()> {
+    fn set_exception(slf: Py<Self>, py: Python<'_>, exception: Py<PyAny>) -> PyResult<()> {
         let (state, callbacks, loop_) = {
             let refs = slf.borrow(py);
             (
@@ -144,8 +144,8 @@ impl UringFuture {
     fn add_done_callback(
         slf: Py<Self>,
         py: Python<'_>,
-        func: PyObject,
-        context: Option<PyObject>,
+        func: Py<PyAny>,
+        context: Option<Py<PyAny>>,
     ) -> PyResult<()> {
         let (state, callbacks, loop_) = {
             let refs = slf.borrow(py);
@@ -171,7 +171,7 @@ impl UringFuture {
         Ok(())
     }
 
-    fn remove_done_callback(&self, func: PyObject, _py: Python<'_>) -> usize {
+    fn remove_done_callback(&self, func: Py<PyAny>, _py: Python<'_>) -> usize {
         let mut callbacks = self.callbacks.lock();
         let len_before = callbacks.len();
         callbacks.retain(|(f, _)| !f.is(&func));
@@ -186,7 +186,7 @@ impl UringFuture {
         slf
     }
 
-    fn __next__(slf: Py<Self>, py: Python<'_>) -> PyResult<Option<PyObject>> {
+    fn __next__(slf: Py<Self>, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         let slf_clone = slf.clone_ref(py);
         let refs = slf.borrow(py);
         let state = refs.state.lock();
@@ -210,7 +210,11 @@ impl UringFuture {
 
     /// `send()` is required for coroutine protocol - behaves like __next__
     #[pyo3(signature = (_value=None))]
-    fn send(slf: Py<Self>, py: Python<'_>, _value: Option<PyObject>) -> PyResult<Option<PyObject>> {
+    fn send(
+        slf: Py<Self>,
+        py: Python<'_>,
+        _value: Option<Py<PyAny>>,
+    ) -> PyResult<Option<Py<PyAny>>> {
         // send() is effectively the same as __next__ for futures
         Self::__next__(slf, py)
     }
@@ -220,10 +224,10 @@ impl UringFuture {
     fn throw(
         &self,
         py: Python<'_>,
-        typ: PyObject,
-        val: Option<PyObject>,
-        tb: Option<PyObject>,
-    ) -> PyResult<PyObject> {
+        typ: Py<PyAny>,
+        val: Option<Py<PyAny>>,
+        tb: Option<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
         // Re-raise the exception
         let exc = if let Some(v) = val { v } else { typ.call0(py)? };
 
@@ -234,7 +238,7 @@ impl UringFuture {
         Err(PyErr::from_value(exc.bind(py).clone()))
     }
 
-    fn get_loop(&self, py: Python<'_>) -> PyObject {
+    fn get_loop(&self, py: Python<'_>) -> Py<PyAny> {
         self.loop_.clone_ref(py)
     }
 }
@@ -245,8 +249,8 @@ impl UringFuture {
         &self,
         py: Python<'_>,
         scheduler: &crate::scheduler::Scheduler,
-        result: PyObject,
-        future_obj: PyObject,
+        result: Py<PyAny>,
+        future_obj: Py<PyAny>,
     ) -> PyResult<()> {
         let mut state_guard = self.state.lock();
         if !matches!(*state_guard, FutureState::Pending) {
@@ -262,8 +266,8 @@ impl UringFuture {
         &self,
         py: Python<'_>,
         scheduler: &crate::scheduler::Scheduler,
-        exception: PyObject,
-        future_obj: PyObject,
+        exception: Py<PyAny>,
+        future_obj: Py<PyAny>,
     ) -> PyResult<()> {
         let mut state_guard = self.state.lock();
         if !matches!(*state_guard, FutureState::Pending) {
@@ -279,7 +283,7 @@ impl UringFuture {
         &self,
         py: Python<'_>,
         scheduler: &crate::scheduler::Scheduler,
-        future_obj: PyObject,
+        future_obj: Py<PyAny>,
     ) -> PyResult<()> {
         let mut cb_guard = self.callbacks.lock();
         let drained: Vec<_> = cb_guard.drain(..).collect();
@@ -287,14 +291,13 @@ impl UringFuture {
 
         for (func, ctx) in drained {
             // Construct UringHandle directly
-            // args = (future_obj,)
             let args_tuple = pyo3::types::PyTuple::new(py, vec![future_obj.clone_ref(py)])?;
             let args: Py<pyo3::types::PyTuple> = args_tuple.into();
 
             let handle =
                 crate::handle::UringHandle::new_native(func, args, self.loop_.clone_ref(py), ctx);
-            // handle must be converted to PyObject to store in scheduler
-            // Scheduler stores PyObject (handles)
+            // handle must be converted to Py<PyAny> to store in scheduler
+            // Scheduler stores Py<PyAny> (handles)
             let py_handle = Py::new(py, handle)?;
 
             scheduler.push(py_handle.into_any());
@@ -304,9 +307,9 @@ impl UringFuture {
 
     fn _schedule_callbacks(
         py: Python<'_>,
-        callbacks: Arc<Mutex<Vec<(PyObject, Option<PyObject>)>>>,
-        loop_: PyObject,
-        future_obj: PyObject,
+        callbacks: Arc<Mutex<Vec<(Py<PyAny>, Option<Py<PyAny>>)>>>,
+        loop_: Py<PyAny>,
+        future_obj: Py<PyAny>,
     ) -> PyResult<()> {
         let mut cb_guard = callbacks.lock();
         let drained: Vec<_> = cb_guard.drain(..).collect();
@@ -320,10 +323,10 @@ impl UringFuture {
 
     fn _schedule_single(
         py: Python<'_>,
-        loop_: PyObject,
-        func: PyObject,
-        future_obj: PyObject,
-        context: Option<PyObject>,
+        loop_: Py<PyAny>,
+        func: Py<PyAny>,
+        future_obj: Py<PyAny>,
+        context: Option<Py<PyAny>>,
     ) -> PyResult<()> {
         let args = (func, future_obj);
         if let Some(ctx) = context {

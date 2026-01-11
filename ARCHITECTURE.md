@@ -473,7 +473,7 @@ Expose runtime metrics (inflight buffers, queue lengths, completion latency, buf
 
 ---
 
-## Native Task Scheduling (Phase 3 + Phase 10)
+## Native Task Scheduling
 
 `uringcore` moves the scheduling logic entirely to Rust to reduce Python overhead.
 
@@ -490,7 +490,7 @@ Expose runtime metrics (inflight buffers, queue lengths, completion latency, buf
 
 ---
 
-## Performance Bottleneck Analysis (Phase 11)
+## Performance Bottleneck Analysis
 
 ### The PyO3 Boundary Problem
 
@@ -525,7 +525,7 @@ To match `uvloop`, uringcore would need:
 2. Rust-native coroutine iteration without Python callbacks
 3. This is a fundamental architectural change
 
-## Native Futures (Phase 5)
+## Native Futures
 
 Traditional `asyncio.Future` is implemented in Python (with a C accelerator). `uringcore` implements `UringFuture` entirely in Rust (`#[pyclass]`).
 
@@ -585,7 +585,15 @@ The following state-of-the-art optimizations have been implemented or are availa
 |--------|-----------|--------|---------|
 | `sleep(0)` | 5.24 µs | 12.20 µs | **2.3x** |
 | `create_task` | 8.97 µs | 13.46 µs | **1.5x** |
+| `sock_sendto` (throughput) | 831k ops/s | 550k ops/s | **1.5x** |
 | `gather(100)` | 139 µs | 105 µs | 0.75x |
+
+### Hybrid Syscall Strategy
+For latency-sensitive or high-throughput non-blocking operations like `sock_sendto` (UDP), `uringcore` employs a hybrid strategy:
+1.  **Optimistic Syscall**: Attempt a direct non-blocking system call (`sendto`) first.
+2.  **Success**: If successful (buffer space available), return immediately. This bypasses the overhead of creating a Future and submitting to the io_uring SQ (saving ~1-2µs per op).
+3.  **Fallback**: If `EAGAIN`/`EWOULDBLOCK` is returned, fall back to the robust `io_uring` path: create a Future, submit `IORING_OP_POLL_ADD`/`IORING_OP_SEND`, and await completion.
+This approach yields **~831k ops/sec** vs standard `asyncio`'s ~550k ops/sec.
 
 ---
 
@@ -598,7 +606,7 @@ The following state-of-the-art optimizations have been implemented or are availa
 
 ---
 
-## Phase 14: Stress Testing & Robustness
+## Stress Testing & Robustness
 
 ### Timer Handle Cancellation Fix
 During stress testing, a critical issue was identified where `asyncio.TimerHandle` objects were executed by the Rust scheduler even after being cancelled in Python. This occurred because `TimerHandle.cancel()` clears the callback arguments (`_args = None`), leading to a `TypeError` when the Rust scheduler blindly invoked `_run()`.

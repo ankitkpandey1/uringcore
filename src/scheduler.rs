@@ -9,7 +9,7 @@ use std::sync::Arc;
 /// for single-threaded asyncio workloads compared to channel-based solutions.
 #[derive(Clone)]
 pub struct Scheduler {
-    queue: Arc<Mutex<VecDeque<PyObject>>>,
+    queue: Arc<Mutex<VecDeque<Py<PyAny>>>>,
 }
 
 impl Default for Scheduler {
@@ -27,13 +27,13 @@ impl Scheduler {
     }
 
     /// Push a task to the ready queue.
-    pub fn push(&self, handle: PyObject) {
+    pub fn push(&self, handle: Py<PyAny>) {
         self.queue.lock().push_back(handle);
     }
 
     /// Pop a task from the ready queue.
     #[must_use]
-    pub fn pop(&self) -> Option<PyObject> {
+    pub fn pop(&self) -> Option<Py<PyAny>> {
         self.queue.lock().pop_front()
     }
 
@@ -52,7 +52,7 @@ impl Scheduler {
     /// Drain all items from the queue efficiently.
     /// This swaps the underlying queue with a new empty one to minimize lock hold time.
     #[must_use]
-    pub fn drain(&self) -> VecDeque<PyObject> {
+    pub fn drain(&self) -> VecDeque<Py<PyAny>> {
         let mut queue = self.queue.lock();
         if queue.is_empty() {
             return VecDeque::new();

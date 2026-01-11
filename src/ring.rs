@@ -17,11 +17,11 @@
 // len() == 0 is sometimes clearer
 #![allow(clippy::len_zero)]
 
-use io_uring::{opcode, types, IoUring, Submitter};
+use io_uring::{IoUring, Submitter, opcode, types};
 use nix::sys::eventfd::{EfdFlags, EventFd};
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::buffer::BufferPool;
 use crate::error::{Error, Result};
@@ -97,12 +97,20 @@ pub enum OpType {
     Close = 4,
     /// Timeout operation
     Timeout = 5,
-    /// SOTA: Multishot receive (kernel 5.19+)
+    /// Multishot receive (kernel 5.19+)
     RecvMulti = 6,
-    /// SOTA: Zero-copy send (kernel 6.0+)
+    /// Zero-copy send (kernel 6.0+)
     SendZC = 7,
-    /// SOTA: Multishot accept (kernel 5.19+)
+    /// Multishot accept (kernel 5.19+)
     AcceptMulti = 8,
+    /// `RecvMsg` operation
+    RecvMsg = 9,
+    /// `SendMsg` operation
+    SendMsg = 10,
+    /// Provided buffer ring group ID
+    ProvideBuffer = 11,
+    /// Registered FD table (`IOSQE_FIXED_FILE`)
+    FixedFdTable = 12,
     /// Unknown operation
     Unknown = 255,
 }
@@ -121,6 +129,10 @@ impl OpType {
             6 => Self::RecvMulti,
             7 => Self::SendZC,
             8 => Self::AcceptMulti,
+            9 => Self::RecvMsg,
+            10 => Self::SendMsg,
+            11 => Self::ProvideBuffer,
+            12 => Self::FixedFdTable,
             _ => Self::Unknown,
         }
     }
@@ -138,6 +150,10 @@ impl OpType {
             Self::RecvMulti => "recv_multi",
             Self::SendZC => "send_zc",
             Self::AcceptMulti => "accept_multi",
+            Self::RecvMsg => "recvmsg",
+            Self::SendMsg => "sendmsg",
+            Self::ProvideBuffer => "provide_buffer",
+            Self::FixedFdTable => "fixed_fd_table",
             Self::Unknown => "unknown",
         }
     }
@@ -180,9 +196,9 @@ pub struct Ring {
     is_active: AtomicBool,
     /// Buffer pool reference for registered buffers
     buffer_pool: Option<Arc<BufferPool>>,
-    /// SOTA: Registered FD table (`IOSQE_FIXED_FILE`)
+    /// Registered FD table (`IOSQE_FIXED_FILE`)
     registered_fds: Option<FixedFdTable>,
-    /// SOTA: Provided buffer ring group ID
+    /// Provided buffer ring group ID
     provided_buf_group_id: Option<u16>,
 }
 
@@ -397,10 +413,12 @@ impl Ring {
         // Let's check if the crate supports it. If not, we use raw register.
         // io-uring crate 0.6+ supports register_buf_ring.
 
-        self.ring
-            .submitter()
-            .register_buf_ring_with_flags(addr, ring_entries, bgid, 0)
-            .map_err(|e| Error::RingOp(format!("register_buf_ring failed: {e}")))?;
+        unsafe {
+            self.ring
+                .submitter()
+                .register_buf_ring_with_flags(addr, ring_entries, bgid, 0)
+                .map_err(|e| Error::RingOp(format!("register_buf_ring failed: {e}")))?;
+        }
 
         self.provided_buf_group_id = Some(bgid);
         Ok(())
@@ -540,8 +558,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push failed".into()))
+            }
         })
     }
 
@@ -573,8 +593,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push failed".into()))
+            }
         })
     }
 
@@ -718,7 +740,7 @@ impl Ring {
     /// Prepare a standalone timeout operation (native timer).
     ///
     /// Returns completion when `deadline_ns` (absolute monotonic time) is reached.
-    /// Use `encode_user_data(timer_id, OpType::Timeout, gen)` for `user_data`.
+    /// Use `encode_user_data(timer_id, OpType::Timeout, generation)` for `user_data`.
     pub fn prep_timeout(&mut self, deadline_ns: u64, user_data: u64) -> Result<()> {
         // Convert nanoseconds to timespec
         #[allow(clippy::cast_possible_truncation)]
@@ -798,6 +820,76 @@ impl Ring {
         })
     }
 
+    /// Prepare a recvmsg operation.
+    ///
+    /// # Safety
+    ///
+    /// The msghdr must remain valid until completion.
+    pub unsafe fn prep_recvmsg(
+        &mut self,
+        fd: RawFd,
+        msg: *mut libc::msghdr,
+        _buf_idx: u16,
+        generation: u16,
+    ) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::RecvMsg, generation);
+
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::RecvMsg::new(types::Fixed(idx), msg)
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::RecvMsg::new(types::Fd(fd), msg)
+                .build()
+                .user_data(user_data)
+        };
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push recvmsg failed".into()))
+            }
+        })
+    }
+
+    /// Prepare a sendmsg operation.
+    ///
+    /// # Safety
+    ///
+    /// The msghdr must remain valid until completion.
+    pub unsafe fn prep_sendmsg(
+        &mut self,
+        fd: RawFd,
+        msg: *mut libc::msghdr,
+        _buf_idx: u16,
+        generation: u16,
+    ) -> Result<()> {
+        let user_data = encode_user_data(fd, OpType::SendMsg, generation);
+
+        let entry = if let Some(idx) = self.lookup_fixed(fd) {
+            opcode::SendMsg::new(types::Fixed(idx), msg)
+                .build()
+                .user_data(user_data)
+        } else {
+            opcode::SendMsg::new(types::Fd(fd), msg)
+                .build()
+                .user_data(user_data)
+        };
+
+        self.with_sq(|sq| {
+            if sq.is_full() {
+                return Err(Error::RingOp("SQ is full".into()));
+            }
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push sendmsg failed".into()))
+            }
+        })
+    }
+
     // =========================================================================
     // SOTA 2025: Registered FD Table (IOSQE_FIXED_FILE)
     // =========================================================================
@@ -869,8 +961,10 @@ impl Ring {
             if sq.is_full() {
                 return Err(Error::RingOp("SQ is full".into()));
             }
-            sq.push(&entry)
-                .map_err(|_| Error::RingOp("push send_zc failed".into()))
+            unsafe {
+                sq.push(&entry)
+                    .map_err(|_| Error::RingOp("push send_zc failed".into()))
+            }
         })
     }
 
@@ -943,9 +1037,9 @@ mod tests {
     fn test_user_data_encoding() {
         let fd = 42i32;
         let op = OpType::Recv;
-        let gen = 1u16;
+        let generation = 1u16;
 
-        let user_data = encode_user_data(fd, op, gen);
+        let user_data = encode_user_data(fd, op, generation);
 
         let entry = CompletionEntry {
             user_data,
@@ -956,7 +1050,7 @@ mod tests {
 
         assert_eq!(entry.fd(), fd);
         assert_eq!(entry.op_type(), OpType::Recv);
-        assert_eq!(entry.generation(), gen);
+        assert_eq!(entry.generation(), generation);
     }
 
     #[test]

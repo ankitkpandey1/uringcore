@@ -1,4 +1,4 @@
-use std::alloc::{alloc_zeroed, dealloc, Layout};
+use std::alloc::{Layout, alloc_zeroed, dealloc};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU16, Ordering};
 
